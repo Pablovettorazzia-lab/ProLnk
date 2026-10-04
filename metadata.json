@@ -1,0 +1,6 @@
+{
+  "name": "ProLnk - Smart Academic Help & Expert Tutoring",
+  "description": "Homework help that doesn’t wait until morning. Instant AI assistance with cited sources, 1-on-1 verified human experts, and community study support.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

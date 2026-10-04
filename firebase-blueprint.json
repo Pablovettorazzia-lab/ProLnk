@@ -1,0 +1,91 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account profile document storing identity and subscription plan",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "User unique identifier matching auth UID" },
+        "name": { "type": "string", "description": "User display name" },
+        "email": { "type": "string", "format": "email", "description": "User primary email address" },
+        "photoURL": { "type": "string", "description": "User profile photo URL" },
+        "plan": { "type": "string", "description": "Current subscription plan" },
+        "role": { "type": "string", "enum": ["student", "tutor", "admin"], "description": "User system role" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of account creation" }
+      },
+      "required": ["id", "name", "email", "plan", "role", "createdAt"]
+    },
+    "UserSession": {
+      "title": "UserSession",
+      "description": "Tutoring session booked by the user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Session ID" },
+        "userId": { "type": "string", "description": "Owner student user UID" },
+        "expertId": { "type": "string", "description": "Tutor identifier" },
+        "expertName": { "type": "string", "description": "Tutor full name" },
+        "subject": { "type": "string", "description": "Academic subject" },
+        "topic": { "type": "string", "description": "Specific topic or lesson focus" },
+        "date": { "type": "string", "description": "Formatted date or schedule time" },
+        "total": { "type": "number", "description": "Cost in Quetzales (Q)" },
+        "status": { "type": "string", "enum": ["confirmed", "completed", "cancelled"], "description": "Session status" },
+        "tutorNotes": { "type": "string", "description": "Notes and feedback provided by tutor" },
+        "createdAt": { "type": "string", "description": "Timestamp created" }
+      },
+      "required": ["id", "userId", "expertId", "expertName", "subject", "topic", "date", "total", "status", "createdAt"]
+    },
+    "ForumPost": {
+      "title": "ForumPost",
+      "description": "Public community homework question and discussion thread",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Post unique ID" },
+        "title": { "type": "string", "description": "Question summary title" },
+        "previewText": { "type": "string", "description": "Detailed question content or preview" },
+        "category": { "type": "string", "description": "Academic subject category" },
+        "author": { "type": "string", "description": "Author display name" },
+        "authorId": { "type": "string", "description": "Author user UID" },
+        "votes": { "type": "number", "description": "Number of community upvotes" },
+        "repliesCount": { "type": "number", "description": "Number of replies" },
+        "hasExpertAnswer": { "type": "boolean", "description": "Whether an expert verified this" },
+        "expertName": { "type": "string", "description": "Name of answering expert" },
+        "expertAnswer": { "type": "string", "description": "Expert verified solution" },
+        "timeAgo": { "type": "string", "description": "Human readable time ago string" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" }
+      },
+      "required": ["id", "title", "previewText", "category", "author", "authorId", "votes", "repliesCount", "createdAt"]
+    },
+    "UserSketch": {
+      "title": "UserSketch",
+      "description": "User saved whiteboard note or scratchpad diagram",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Sketch ID" },
+        "userId": { "type": "string", "description": "Owner user UID" },
+        "title": { "type": "string", "description": "Title of the sketch" },
+        "dataUrl": { "type": "string", "description": "Base64 data or serialized notes" },
+        "timestamp": { "type": "string", "description": "Human readable timestamp" },
+        "createdAt": { "type": "string", "description": "ISO timestamp" }
+      },
+      "required": ["id", "userId", "title", "dataUrl", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Private user profile and account details"
+    },
+    "/users/{userId}/sessions/{sessionId}": {
+      "schema": "UserSession",
+      "description": "User private scheduled and completed tutoring sessions"
+    },
+    "/users/{userId}/sketches/{sketchId}": {
+      "schema": "UserSketch",
+      "description": "User private whiteboard drawings and notes"
+    },
+    "/forum_posts/{postId}": {
+      "schema": "ForumPost",
+      "description": "Public community forum questions and expert answers"
+    }
+  }
+}
