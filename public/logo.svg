@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-120 -105 240 210" width="1024" height="1024" fill="none">
+  <defs>
+    <clipPath id="bottom-half">
+      <rect x="-120" y="-0.5" width="240" height="106" />
+    </clipPath>
+  </defs>
+
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <!-- Layer 1: Left Blue Heart (Rotated 90° clockwise, tip pointing to center right +X) -->
+    <path d="M 42,0 L -25,-65 C -60,-90 -95,-60 -95,-22 C -95,-2 -70,0 -36,0 C -70,0 -95,2 -95,22 C -95,60 -60,90 -25,65 Z"
+          stroke="#FFFFFF" stroke-width="26" />
+    <path d="M 42,0 L -25,-65 C -60,-90 -95,-60 -95,-22 C -95,-2 -70,0 -36,0 C -70,0 -95,2 -95,22 C -95,60 -60,90 -25,65 Z"
+          stroke="#0F2249" stroke-width="16" />
+
+    <!-- Layer 2: Right Yellow Heart (Rotated 90° counter-clockwise, tip pointing to center left -X) -->
+    <!-- Yellow top arm & tip pass over Blue top arm & cleft -->
+    <path d="M -42,0 L 25,65 C 60,90 95,60 95,22 C 95,2 70,0 36,0 C 70,0 95,-2 95,-22 C 95,-60 60,-90 25,-65 Z"
+          stroke="#FFFFFF" stroke-width="26" />
+    <path d="M -42,0 L 25,65 C 60,90 95,60 95,22 C 95,2 70,0 36,0 C 70,0 95,-2 95,-22 C 95,-60 60,-90 25,-65 Z"
+          stroke="#F6C62B" stroke-width="16" />
+
+    <!-- Layer 3: Blue bottom arm & tip pass over Yellow bottom arm & cleft -->
+    <g clip-path="url(#bottom-half)">
+      <path d="M 42,0 L -25,-65 C -60,-90 -95,-60 -95,-22 C -95,-2 -70,0 -36,0 C -70,0 -95,2 -95,22 C -95,60 -60,90 -25,65 Z"
+            stroke="#FFFFFF" stroke-width="26" />
+      <path d="M 42,0 L -25,-65 C -60,-90 -95,-60 -95,-22 C -95,-2 -70,0 -36,0 C -70,0 -95,2 -95,22 C -95,60 -60,90 -25,65 Z"
+            stroke="#0F2249" stroke-width="16" />
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,236 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --logo-navy: #0F2249;
+    --logo-yellow: #F6C62B;
+    --navy-dark: #070e1e;
+    --navy-card: #0d1833;
+    --navy-border: #1e2e5c;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    background-color: #080f21;
+    color: #f1f5f9;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+  }
+}
+
+.font-display {
+  font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+}
+
+.font-hero-headline {
+  font-family: 'Inter', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.04;
+}
+
+.font-mono-nums {
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #080f21;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e2e5c;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2a4185;
+}
+
+/* Glass card styling */
+.glass-panel {
+  background: rgba(13, 24, 51, 0.75);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-panel-hover {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.glass-panel-hover:hover {
+  background: rgba(18, 33, 70, 0.85);
+  border-color: rgba(246, 198, 43, 0.35);
+  transform: translateY(-2px);
+}
+
+/* ========================================================
+   LIGHT THEME ADAPTATION (html.theme-light)
+   Crisp, high-contrast, modern clean academic aesthetic
+   ======================================================== */
+html.theme-light body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+/* Top header & navigation */
+html.theme-light header {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.theme-light .bg-\[\#0c1938\] {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Section backgrounds */
+html.theme-light section {
+  border-color: #e2e8f0 !important;
+}
+
+html.theme-light footer {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Dashboard Sidebar & Main Header */
+html.theme-light aside {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.theme-light main header {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Dark surfaces to clean white cards */
+html.theme-light .bg-\[\#0a1329\],
+html.theme-light .bg-\[\#0c162e\],
+html.theme-light .bg-\[\#0d1833\],
+html.theme-light .bg-\[\#0d1c3d\] {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 1px 2px -1px rgba(15, 23, 42, 0.05);
+}
+
+/* Sub-panels & containers */
+html.theme-light .bg-\[\#080f21\],
+html.theme-light .bg-\[\#070e1e\],
+html.theme-light .bg-\[\#070d1c\],
+html.theme-light .bg-\[\#060b18\] {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.theme-light .bg-\[\#122144\],
+html.theme-light .bg-\[\#112044\],
+html.theme-light .bg-\[\#0d1a36\] {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Gradients */
+html.theme-light .bg-gradient-to-r.from-\[\#0F2249\] {
+  background: linear-gradient(135deg, #f0f4ff 0%, #ffffff 50%, #fefce8 100%) !important;
+  border-color: rgba(246, 198, 43, 0.5) !important;
+}
+
+/* Typography Overrides */
+html.theme-light h1,
+html.theme-light h2,
+html.theme-light h3,
+html.theme-light h4,
+html.theme-light h5,
+html.theme-light h6,
+html.theme-light .font-display,
+html.theme-light .font-hero-headline {
+  color: #0f172a !important;
+}
+
+html.theme-light .text-white {
+  color: #0f172a !important;
+}
+
+/* Retain light text for colored action buttons */
+html.theme-light .bg-\[\#F6C62B\],
+html.theme-light .bg-\[\#F6C62B\] *,
+html.theme-light .text-slate-950 {
+  color: #020617 !important;
+}
+
+html.theme-light .bg-rose-600,
+html.theme-light .bg-rose-600 *,
+html.theme-light .bg-emerald-600,
+html.theme-light .bg-emerald-600 *,
+html.theme-light .bg-blue-600,
+html.theme-light .bg-blue-600 * {
+  color: #ffffff !important;
+}
+
+html.theme-light .text-slate-100,
+html.theme-light .text-slate-200,
+html.theme-light .text-slate-300 {
+  color: #334155 !important;
+}
+
+html.theme-light .text-slate-400 {
+  color: #64748b !important;
+}
+
+/* Borders */
+html.theme-light .border-slate-800,
+html.theme-light .border-slate-800\/80,
+html.theme-light .border-slate-700,
+html.theme-light .border-slate-700\/80 {
+  border-color: #e2e8f0 !important;
+}
+
+/* Form Inputs */
+html.theme-light input,
+html.theme-light select,
+html.theme-light textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.theme-light input::placeholder,
+html.theme-light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Scrollbars in Light Mode */
+html.theme-light ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+html.theme-light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+html.theme-light ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Glass panels in Light Mode */
+html.theme-light .glass-panel {
+  background: rgba(255, 255, 255, 0.85) !important;
+  border-color: rgba(226, 232, 240, 0.9) !important;
+  box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.05);
+}
+
+html.theme-light .glass-panel-hover:hover {
+  background: rgba(248, 250, 252, 0.95) !important;
+  border-color: rgba(246, 198, 43, 0.6) !important;
+}
+
+/* Modals Overlay */
+html.theme-light .bg-black\/75,
+html.theme-light .bg-black\/85 {
+  background-color: rgba(15, 23, 42, 0.55) !important;
+}
