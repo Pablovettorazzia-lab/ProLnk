@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { askAi, getChatHistory, parseAiReply } from '../services/chat';
 import { AI_PRESET_QUESTIONS, EXPERTS_DATA } from '../data/mockData';
 import { Expert } from '../types';
 import { Check, Send, ArrowRight, UserCheck, CheckCircle2, Lock, Sparkles, Star } from 'lucide-react';
@@ -40,158 +41,58 @@ export const Hero: React.FC<HeroProps> = ({ onOpenTrialModal, onBookExpert, isSu
   const [isTyping, setIsTyping] = useState(false);
   const [savedFeedback, setSavedFeedback] = useState(false);
 
-  const handleSelectPreset = (topic: string) => {
-    setSelectedTopic(topic);
-    setSavedFeedback(false);
-    const item = AI_PRESET_QUESTIONS.find(q => q.topic.toLowerCase() === topic.toLowerCase());
-    if (item) {
-      setIsTyping(true);
-      setChatMessages([
-        {
-          id: Date.now() + '-u',
-          sender: 'user',
-          text: item.question
-        }
-      ]);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const sendingRef = useRef(false);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
-      setTimeout(() => {
-        setChatMessages(prev => [
-          ...prev,
-          {
-            id: Date.now() + '-a',
-            sender: 'ai',
-            text: item.answer,
-            source: item.source,
-            expertId: item.expertId
-          }
-        ]);
-        setIsTyping(false);
-      }, 80);
-    }
-  };
+  useEffect(() => {
+    if (!isSubscribed) return;
+    let active = true;
+    setIsHistoryLoading(true);
+    getChatHistory('hero').then(messages => {
+      if (active && messages.length) setChatMessages(messages);
+    }).catch(() => {}).finally(() => { if (active) setIsHistoryLoading(false); });
+    return () => { active = false; };
+  }, [isSubscribed]);
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputVal.trim()) return;
-
+  const sendQuestion = async (question: string) => {
+    const userText = question.trim();
+    if (!userText || sendingRef.current || isHistoryLoading) return;
     if (!isSubscribed && questionsCount >= FREE_QUESTION_LIMIT) {
       onOpenTrialModal();
       return;
     }
-
-    const userText = inputVal.trim();
+    sendingRef.current = true;
     setInputVal('');
     setSavedFeedback(false);
-    setQuestionsCount(prev => prev + 1);
-
-    setChatMessages(prev => [
-      ...prev,
-      {
-        id: Date.now() + '-u',
-        sender: 'user',
-        text: userText
-      }
-    ]);
-
+    setChatError(null);
+    const userMessage = { id: crypto.randomUUID(), sender: 'user' as const, text: userText };
+    setChatMessages(previous => [...previous, userMessage]);
     setIsTyping(true);
-
     try {
-      // Call server-side Gemini API
-      const res = await fetch('/api/ai/ask', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: userText })
-      });
-
-      const data = await res.json();
-
-      if (data && data.reply) {
-        // Parse reply text and optional Source line
-        const lines = data.reply.split('\n');
-        let sourceLine = 'OpenStax Peer-Reviewed Curriculum Standards';
-        let bodyLines = [];
-
-        for (const line of lines) {
-          if (line.toLowerCase().startsWith('source:')) {
-            sourceLine = line.replace(/source:\s*/i, '').trim();
-          } else {
-            bodyLines.push(line);
-          }
-        }
-
-        const bodyText = bodyLines.join('\n').trim();
-
-        // Assign suitable expert for follow-up
-        const lower = userText.toLowerCase();
-        let expertId = 'daniela-rios';
-        if (lower.includes('physics') || lower.includes('gravity') || lower.includes('force') || lower.includes('speed')) {
-          expertId = 'andres-molina';
-        } else if (lower.includes('chemistry') || lower.includes('molecule') || lower.includes('reaction') || lower.includes('biology')) {
-          expertId = 'marcus-bell';
-        } else if (lower.includes('essay') || lower.includes('thesis') || lower.includes('writing') || lower.includes('grammar')) {
-          expertId = 'priya-nair';
-        } else if (lower.includes('python') || lower.includes('code') || lower.includes('programming') || lower.includes('sql')) {
-          expertId = 'tomas-herrera';
-        }
-
-        setChatMessages(prev => [
-          ...prev,
-          {
-            id: Date.now() + '-a',
-            sender: 'ai',
-            text: bodyText || data.reply,
-            source: sourceLine,
-            expertId: expertId
-          }
-        ]);
-        setIsTyping(false);
-        return;
-      }
-    } catch {
-      // Ignore and fallback gracefully
-    }
-
-    // Fallback if API key is not configured or offline
-    setTimeout(() => {
-      let answerText = '';
-      let sourceText = '';
-      let expertId = 'daniela-rios';
-
-      const lower = userText.toLowerCase();
-      if (lower.includes('integral') || lower.includes('derivative') || lower.includes('math') || lower.includes('calculus')) {
-        answerText = 'Here is the step-by-step method:\n1. Rewrite the expression into fundamental components.\n2. Apply the chain rule or integration by parts (LIATE rule).\n3. Check edge boundary limits to verify the final answer.';
-        sourceText = 'Stewart Calculus: Early Transcendentals (8th Ed), Section 4.3';
-        expertId = 'daniela-rios';
-      } else if (lower.includes('physics') || lower.includes('force') || lower.includes('acceleration') || lower.includes('momentum')) {
-        answerText = 'For this physics problem:\n1. Draw a clear free-body diagram showing all external forces.\n2. Set up Newton\'s 2nd Law equations: ΣFx = m·ax and ΣFy = m·ay.\n3. Solve for unknown components and check physical units.';
-        sourceText = 'Giancoli Physics: Principles with Applications (7th Ed), Chapter 4';
-        expertId = 'andres-molina';
-      } else if (lower.includes('chemistry') || lower.includes('reaction') || lower.includes('moles') || lower.includes('acid')) {
-        answerText = 'Key chemistry steps:\n1. Balance the chemical equation with correct integer coefficients.\n2. Convert given mass to moles (moles = mass / molar mass).\n3. Apply stoichiometric ratios to find limiting reagent and theoretical yield.';
-        sourceText = 'Atkins & Jones, Chemical Principles (6th Ed), Section 2.1';
-        expertId = 'marcus-bell';
-      } else if (lower.includes('essay') || lower.includes('thesis') || lower.includes('argument')) {
-        answerText = 'To structure a persuasive academic thesis:\n1. Counter-argument: Acknowledge the primary opposing viewpoint.\n2. Central claim: State your specific, debatable stance.\n3. Rationale: Provide the "because" clause previewing your body evidence.';
-        sourceText = 'The Craft of Research (4th Ed), Chapter 9';
-        expertId = 'priya-nair';
-      } else {
-        answerText = `Here is the step-by-step breakdown:\n1. Deconstruct the problem into foundational premises.\n2. Connect relevant course formulas to the given variables.\n3. Test the result against standard physical/mathematical invariants.`;
-        sourceText = 'OpenStax General College Curriculum (Peer-Reviewed Edition)';
-        expertId = 'daniela-rios';
-      }
-
-      setChatMessages(prev => [
-        ...prev,
-        {
-          id: Date.now() + '-a',
-          sender: 'ai',
-          text: answerText,
-          source: sourceText,
-          expertId: expertId
-        }
-      ]);
+      const { reply } = await askAi(userText, chatMessages, 'hero');
+      setChatMessages(previous => [...previous, { id: crypto.randomUUID(), sender: 'ai', ...parseAiReply(reply), expertId: 'daniela-rios' }]);
+      setQuestionsCount(previous => previous + 1);
+    } catch (error) {
+      setChatMessages(previous => previous.filter(message => message.id !== userMessage.id));
+      setInputVal(userText);
+      setChatError(error instanceof Error ? error.message : 'The assistant could not respond. Please try again.');
+    } finally {
       setIsTyping(false);
-    }, 100);
+      sendingRef.current = false;
+    }
+  };
+
+  const handleSelectPreset = (topic: string) => {
+    if (sendingRef.current || isHistoryLoading) return;
+    setSelectedTopic(topic);
+    const preset = AI_PRESET_QUESTIONS.find(question => question.topic.toLowerCase() === topic.toLowerCase());
+    if (preset) void sendQuestion(preset.question);
+  };
+
+  const handleSendMessage = (event: React.FormEvent) => {
+    event.preventDefault();
+    void sendQuestion(inputVal);
   };
 
   const currentAiMessage = [...chatMessages].reverse().find(m => m.sender === 'ai');
@@ -383,6 +284,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenTrialModal, onBookExpert, isSu
               {/* Chat Input or Free Limit Lock Banner */}
               {!hasReachedLimit ? (
                 <div className="p-3 bg-[#080f21] border-t border-slate-800">
+                  {chatError && <p role="alert" className="px-4 py-2 text-xs text-red-300">{chatError}</p>}
                   <form onSubmit={handleSendMessage} className="flex items-center gap-2">
                     <input
                       type="text"
@@ -393,7 +295,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenTrialModal, onBookExpert, isSu
                     />
                     <button
                       type="submit"
-                      disabled={!inputVal.trim() || isTyping}
+                      disabled={!inputVal.trim() || isTyping || isHistoryLoading}
                       className="px-4 py-2.5 bg-[#F6C62B] hover:bg-[#ffd744] disabled:opacity-50 text-slate-950 font-bold text-xs rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
                     >
                       <span>Send</span>

@@ -1,3 +1,4 @@
+import { askAi, getChatHistory, parseAiReply } from '../services/chat';
 import React, { useState, useEffect, useRef } from 'react';
 import { ProLnkLogo } from './Logo';
 import { Expert, ForumPost, ForumComment, DashboardSession } from '../types';
@@ -63,6 +64,9 @@ import {
 interface DashboardProps {
   user: {
     uid?: string;
+    isDemo?: boolean;
+    emailNotifications?: boolean;
+    aiExplanationStyle?: 'detailed' | 'quick';
     name: string;
     email: string;
     photoURL?: string;
@@ -83,7 +87,7 @@ interface DashboardProps {
   onLogOut: () => void;
   onViewLandingPage: () => void;
   onBookExpert: (expert: Expert) => void;
-  onUpdateProfile?: (updated: Partial<DashboardProps['user']>) => void;
+  onUpdateProfile?: (updated: Partial<DashboardProps['user']>) => void | Promise<void>;
   onOpenProfile?: () => void;
 }
 
@@ -105,60 +109,63 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // Profile edit states
   const [profileName, setProfileName] = useState(user.name || '');
-  const [profileBio, setProfileBio] = useState(user.bio || 'Estudiante universitario apasionado por dominar cálculo y materias STEM con apoyo de ProLnk.');
-  const [profileUniversity, setProfileUniversity] = useState(user.university || 'Universidad del Valle de Guatemala');
-  const [profileMajor, setProfileMajor] = useState(user.major || 'Ingeniería en Ciencias de la Computación');
-  const [profileSemester, setProfileSemester] = useState(user.semester || '4to Semestre');
-  const [profileLearningGoal, setProfileLearningGoal] = useState(user.learningGoal || 'Dominar derivadas e integrales y mantener promedio superior a 90.');
+  const [profileBio, setProfileBio] = useState(user.bio ?? '');
+  const [profileUniversity, setProfileUniversity] = useState(user.university ?? '');
+  const [profileMajor, setProfileMajor] = useState(user.major ?? '');
+  const [profileSemester, setProfileSemester] = useState(user.semester ?? '');
+  const [profileLearningGoal, setProfileLearningGoal] = useState(user.learningGoal ?? '');
   const [profilePhotoURL, setProfilePhotoURL] = useState(user.photoURL || '');
   const [profileSubjects, setProfileSubjects] = useState<string[]>(
     user.targetSubjects && user.targetSubjects.length > 0
       ? user.targetSubjects
-      : ['Cálculo Multivariable', 'Física II', 'Álgebra Lineal']
+      : []
   );
   const [newSubjectInput, setNewSubjectInput] = useState('');
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const PRESET_AVATARS = [
-    { id: 'av1', label: 'Estudiante Tech', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80' },
-    { id: 'av2', label: 'Ingeniero', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=250&q=80' },
-    { id: 'av3', label: 'Científica', url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=250&q=80' },
-    { id: 'av4', label: 'Académico', url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=250&q=80' },
-    { id: 'av5', label: 'Matemática', url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=250&q=80' },
+    { id: 'av1', label: 'Tech Student', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80' },
+    { id: 'av2', label: 'Engineer', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=250&q=80' },
+    { id: 'av3', label: 'Scientist', url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=250&q=80' },
+    { id: 'av4', label: 'Scholar', url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=250&q=80' },
+    { id: 'av5', label: 'Mathematician', url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=250&q=80' },
   ];
   const [profileSubTab, setProfileSubTab] = useState<'info' | 'achievements' | 'preferences'>('info');
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [aiExplanationStyle, setAiExplanationStyle] = useState<'detailed' | 'quick'>('detailed');
+  const [emailNotifications, setEmailNotifications] = useState(user.emailNotifications ?? true);
+  const [aiExplanationStyle, setAiExplanationStyle] = useState<'detailed' | 'quick'>(user.aiExplanationStyle ?? 'detailed');
 
   // Sync profile state when user prop updates
   useEffect(() => {
-    if (user.name) setProfileName(user.name);
-    if (user.bio) setProfileBio(user.bio);
-    if (user.university) setProfileUniversity(user.university);
-    if (user.major) setProfileMajor(user.major);
-    if (user.semester) setProfileSemester(user.semester);
-    if (user.learningGoal) setProfileLearningGoal(user.learningGoal);
-    if (user.photoURL) setProfilePhotoURL(user.photoURL);
-    if (user.targetSubjects) setProfileSubjects(user.targetSubjects);
+    setProfileName(user.name ?? '');
+    setProfileBio(user.bio ?? '');
+    setProfileUniversity(user.university ?? '');
+    setProfileMajor(user.major ?? '');
+    setProfileSemester(user.semester ?? '');
+    setProfileLearningGoal(user.learningGoal ?? '');
+    setProfilePhotoURL(user.photoURL ?? '');
+    setProfileSubjects(user.targetSubjects ?? []);
   }, [user]);
 
-  const handleSaveProfile = (e?: React.FormEvent) => {
+  const handleSaveProfile = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!profileName.trim()) return;
 
-    if (onUpdateProfile) {
-      onUpdateProfile({
+    try {
+      await onUpdateProfile?.({
         name: profileName.trim(),
         bio: profileBio.trim(),
         university: profileUniversity.trim(),
         major: profileMajor.trim(),
         semester: profileSemester.trim(),
         learningGoal: profileLearningGoal.trim(),
-        photoURL: profilePhotoURL || undefined,
-        targetSubjects: profileSubjects
+        photoURL: profilePhotoURL || '',
+        targetSubjects: profileSubjects,
+        emailNotifications,
+        aiExplanationStyle,
       });
+      showDashboardToast(user.isDemo ? 'Demo profile updated for this visit only.' : 'Profile saved successfully.');
+    } catch (error) {
+      showDashboardToast(error instanceof Error ? error.message : 'Your profile could not be saved.');
     }
-
-    showDashboardToast('¡Perfil guardado y sincronizado con éxito! 🎉');
   };
 
   const handleAddSubject = (e: React.FormEvent) => {
@@ -200,7 +207,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       } catch {
         // ignore
       }
-      showDashboardToast(next ? 'Menú lateral guardado (vista compacta)' : 'Menú lateral desplegado');
+      showDashboardToast(next ? 'Sidebar collapsed (compact view)' : 'Sidebar expanded');
       return next;
     });
   };
@@ -352,8 +359,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     {
       id: 'd-1',
       sender: 'ai',
-      text: `Hello ${user.name}! I am your ProLnk 24/7 AI tutor. You have unlimited messages enabled with your 3-day trial. What homework problem or exam topic are you working on right now?`,
-      source: 'ProLnk Unified Academic Assistant'
+      text: `Hello ${user.name}! I am your ProLnk AI tutor. What homework problem or exam topic are you working on right now?`
     }
   ]);
   const [isAiThinking, setIsAiThinking] = useState(false);
@@ -447,100 +453,48 @@ export const Dashboard: React.FC<DashboardProps> = ({
     showDashboardToast('Your question was posted to the Community Board! 🚀');
   };
 
-  const handleSendAiMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!aiInput.trim()) return;
+  const [aiError, setAiError] = useState<string | null>(null);
+  const aiSendingRef = useRef(false);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
-    const userText = aiInput.trim();
+  useEffect(() => {
+    if (user.isDemo) return;
+    let active = true;
+    setIsHistoryLoading(true);
+    getChatHistory('dashboard').then(messages => {
+      if (active && messages.length) setAiChatMessages(messages);
+    }).catch(() => {
+      if (active) setAiError('Your chat history could not be loaded. Please try again later.');
+    }).finally(() => { if (active) setIsHistoryLoading(false); });
+    return () => { active = false; };
+  }, [user.uid]);
+
+  const sendAiQuestion = async (question: string) => {
+    const userText = question.trim();
+    if (!userText || aiSendingRef.current || isHistoryLoading) return;
+    aiSendingRef.current = true;
     setAiInput('');
-
-    setAiChatMessages(prev => [
-      ...prev,
-      { id: Date.now() + '-u', sender: 'user', text: userText }
-    ]);
-
+    setAiError(null);
+    const userMessage = { id: crypto.randomUUID(), sender: 'user' as const, text: userText };
+    setAiChatMessages(previous => [...previous, userMessage]);
     setIsAiThinking(true);
-
     try {
-      const res = await fetch('/api/ai/ask', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: userText })
-      });
-      const data = await res.json();
-
-      if (data && data.reply) {
-        const lines = data.reply.split('\n');
-        let sourceLine = 'OpenStax Peer-Reviewed Academic Database';
-        let bodyLines = [];
-
-        for (const line of lines) {
-          if (line.toLowerCase().startsWith('source:')) {
-            sourceLine = line.replace(/source:\s*/i, '').trim();
-          } else {
-            bodyLines.push(line);
-          }
-        }
-
-        setAiChatMessages(prev => [
-          ...prev,
-          {
-            id: Date.now() + '-a',
-            sender: 'ai',
-            text: bodyLines.join('\n').trim() || data.reply,
-            source: sourceLine
-          }
-        ]);
-        setIsAiThinking(false);
-        setTimeout(() => chatLogEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
-        return;
-      }
-    } catch {
-      // Fallback below
-    }
-
-    setTimeout(() => {
-      const lower = userText.toLowerCase();
-      const isSpanish = /[áéíóúñ¿¡]/.test(lower) || lower.includes('como') || lower.includes('cual') || lower.includes('qué') || lower.includes('derivad') || lower.includes('física') || lower.includes('química') || lower.includes('resolver') || lower.includes('explic');
-
-      let answer = isSpanish
-        ? 'Resolución académica paso a paso:\n1. Identifica los parámetros conocidos y establece las condiciones iniciales.\n2. Aplica el teorema o fórmula correspondiente y simplifica términos algebraicos.\n3. Verifica el resultado y sus unidades.'
-        : 'Step-by-step academic resolution:\n1. Identify known parameters and establish initial conditions.\n2. Apply the fundamental theorem or formula and simplify terms.\n3. Verify validity, dimensions, and boundary units.';
-      let source = 'OpenStax College Science & Math Standards';
-
-      if (lower.includes('derivad') || lower.includes('calcul') || lower.includes('integral') || lower.includes('derivative')) {
-        if (isSpanish) {
-          answer = 'Solución de cálculo paso a paso:\n1. Aplica la regla diferencial adecuada (regla de la cadena d/dx[f(g(x))] = f\'(g(x))·g\'(x) o integración por partes).\n2. Factoriza los términos diferenciales comunes.\n3. Despeja dy/dx y verifica con las propiedades algebraicas.';
-          source = 'Stewart Cálculo: Trascendentes Tempranas (8va Ed), Capítulo 3';
-        } else {
-          answer = 'Calculus problem breakdown:\n1. Apply implicit differentiation or the chain rule d/dx [f(g(x))] = f\'(g(x)) · g\'(x).\n2. Factor out the common derivative terms.\n3. Solve for dy/dx and test against known polynomial properties.';
-          source = 'Stewart Calculus (8th Ed), Chapter 3';
-        }
-      } else if (lower.includes('físic') || lower.includes('fuerza') || lower.includes('energ') || lower.includes('physics') || lower.includes('force')) {
-        if (isSpanish) {
-          answer = 'Desglose de física paso a paso:\n1. Dibuja el diagrama de cuerpo libre (DCL) y define la convención de signos.\n2. Aplica la conservación de energía mecánica E_inicial = E_final o ΣF = m·a.\n3. Calcula el trabajo de rozamiento W_f = μ·N·d si corresponde.';
-          source = 'Giancoli Física: Principios con Aplicaciones (7ma Ed), Capítulo 4';
-        } else {
-          answer = 'Physics solution breakdown:\n1. Draw coordinate axes and set upward/rightward as positive.\n2. Apply conservation of mechanical energy: E_initial = E_final.\n3. Account for friction loss W_f = f_k · d if applicable.';
-          source = 'Giancoli Physics: Principles with Applications (7th Ed)';
-        }
-      } else if (lower.includes('químic') || lower.includes('chemistry') || lower.includes('reaccion') || lower.includes('molecul')) {
-        if (isSpanish) {
-          answer = 'Solución de química paso a paso:\n1. Balancea la ecuación estequiométrica asegurando conservación de masa.\n2. Convierte las masas a moles (n = m/M) y encuentra el reactivo limitante.\n3. Calcula el rendimiento teórico del producto.';
-          source = 'Chang Química General (12va Ed), Capítulo 3';
-        } else {
-          answer = 'Chemistry solution breakdown:\n1. Balance the chemical reaction to conserve moles.\n2. Convert mass to moles (n = m/M) and identify the limiting reactant.\n3. Compute theoretical yield and apply ideal gas law (PV = nRT) if applicable.';
-          source = 'Chang General Chemistry (12th Ed), Chapter 3';
-        }
-      }
-
-      setAiChatMessages(prev => [
-        ...prev,
-        { id: Date.now() + '-a', sender: 'ai', text: answer, source }
-      ]);
+      const { reply } = await askAi(userText, aiChatMessages, 'dashboard');
+      setAiChatMessages(previous => [...previous, { id: crypto.randomUUID(), sender: 'ai', ...parseAiReply(reply) }]);
+    } catch (error) {
+      setAiChatMessages(previous => previous.filter(message => message.id !== userMessage.id));
+      setAiInput(userText);
+      setAiError(error instanceof Error ? error.message : 'The assistant could not respond. Please try again.');
+    } finally {
       setIsAiThinking(false);
+      aiSendingRef.current = false;
       setTimeout(() => chatLogEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
-    }, 100);
+    }
+  };
+
+  const handleSendAiMessage = (event: React.FormEvent) => {
+    event.preventDefault();
+    void sendAiQuestion(aiInput);
   };
 
   const handleVote = (id: string) => {
@@ -1536,13 +1490,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 {AI_PRESET_QUESTIONS.map(p => (
                   <button
                     key={p.topic}
-                    onClick={() => {
-                      setAiChatMessages(prev => [
-                        ...prev,
-                        { id: Date.now() + '-u', sender: 'user', text: p.question },
-                        { id: Date.now() + '-a', sender: 'ai', text: p.answer, source: p.source }
-                      ]);
-                    }}
+                    onClick={() => void sendAiQuestion(p.question)}
+                    disabled={isAiThinking || isHistoryLoading}
                     className="px-2.5 py-1 rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs whitespace-nowrap cursor-pointer transition-colors"
                   >
                     {p.topic}
@@ -1551,6 +1500,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
 
               {/* Input Form */}
+              {aiError && <p role="alert" className="px-4 py-2 text-xs text-red-300">{aiError}</p>}
               <form onSubmit={handleSendAiMessage} className="p-3.5 bg-[#080f21] border-t border-slate-800 flex items-center gap-2">
                 <input
                   type="text"
@@ -1561,7 +1511,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 />
                 <button
                   type="submit"
-                  disabled={!aiInput.trim() || isAiThinking}
+                  disabled={!aiInput.trim() || isAiThinking || isHistoryLoading}
                   className="px-5 py-2.5 bg-[#F6C62B] hover:bg-[#ffd744] disabled:opacity-50 text-slate-950 font-bold text-xs rounded-xl cursor-pointer flex items-center gap-1.5"
                 >
                   <span>Solve</span>
@@ -1639,7 +1589,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             <div className="space-y-4">
-              {(propSessions && propSessions.length > 0 ? propSessions : USER_PAST_SESSIONS).map(s => (
+              {(propSessions ?? (user.isDemo ? USER_PAST_SESSIONS : [])).map(s => (
                 <div key={s.id} className="bg-[#0c162e] border border-slate-700 rounded-2xl p-5 space-y-3">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                     <div className="flex items-center gap-3">
@@ -2174,7 +2124,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     handleDownloadFormula(
                       'ProLnk_Live_Session_Notes_Daniela_Rios.md',
                       'Classroom Notes',
-                      '# ProLnk Live 1-on-1 Session Notes\nTutor: Daniela Ríos\nStudent: ' + user.name + '\nDate: ' + new Date().toLocaleDateString() + '\n\n## Covered Topics:\n1. Integration by Parts LIATE priority\n2. Tabular method for repeated integrals\n3. Homework review problems 14 to 28.'
+                      '# ProLnk Live 1-on-1 Session Notes\nTutor: Daniela Ríos\nStudent: ' + user.name + '\nDate: ' + new Date().toLocaleDateString('en-US') + '\n\n## Covered Topics:\n1. Integration by Parts LIATE priority\n2. Tabular method for repeated integrals\n3. Homework review problems 14 to 28.'
                     );
                   }}
                   className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold cursor-pointer"

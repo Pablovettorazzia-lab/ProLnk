@@ -1,3 +1,4 @@
+import { signInWithGoogle, loginUserWithEmail, registerUserWithEmail, authErrorMessage } from '../services/auth';
 import React, { useState } from 'react';
 import { Expert } from '../types';
 import { X, CheckCircle2, ShieldCheck, Zap, Sparkles, Mail, Send } from 'lucide-react';
@@ -184,13 +185,12 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 export const TrialModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
-  onRegister?: (name: string, email: string, uid?: string, photoURL?: string) => void;
+  onRegister?: (name: string, email: string, uid?: string, photoURL?: string) => void | Promise<void>;
 }> = ({
   isOpen,
   onClose,
   onRegister
 }) => {
-  if (!isOpen) return null;
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -198,51 +198,42 @@ export const TrialModal: React.FC<{
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
   const handleGoogleRegister = async () => {
     setIsLoading(true);
     setErrorMsg(null);
     try {
-      const { signInWithGoogle } = await import('../firebase/authService');
-      const user = await signInWithGoogle();
-      if (onRegister) {
-        onRegister(user.displayName || user.email?.split('@')[0] || 'Student', user.email || '', user.uid, user.photoURL || undefined);
-      }
-      onClose();
-    } catch (err: any) {
-      console.error('Google sign-in error:', err);
-      setErrorMsg(err.message || 'Could not complete Google Sign-in. Please try again.');
-    } finally {
+      await signInWithGoogle();
+    } catch (error) {
+      setErrorMsg(authErrorMessage(error));
       setIsLoading(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) return;
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (isLoading) return;
     setIsLoading(true);
     setErrorMsg(null);
-
-    const finalName = name.trim() || email.split('@')[0];
-
+    setSuccessMsg(null);
     try {
-      const { registerUserWithEmail } = await import('../firebase/authService');
-      const pwd = password || 'prolnk123';
-      const user = await registerUserWithEmail(finalName, email, pwd);
-      if (onRegister) {
-        onRegister(user.displayName || finalName, user.email || email, user.uid);
+      const user = await registerUserWithEmail(name.trim() || email.split('@')[0], email, password);
+      if (!user.confirmedAt) {
+        setSuccessMsg('Account created. Check your email and confirm your address to log in.');
+        setPassword('');
+        return;
       }
+      await onRegister?.(user.name || name, user.email || email, user.id);
       onClose();
-    } catch (err: any) {
-      console.warn('Firebase registration notice:', err?.message);
-      // If user exists or auth error, proceed with client account creation
-      if (onRegister) {
-        onRegister(finalName, email);
-      }
-      onClose();
+    } catch (error) {
+      setErrorMsg(authErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
@@ -258,6 +249,7 @@ export const TrialModal: React.FC<{
         </div>
 
         <div className="p-6 space-y-4 text-xs sm:text-sm">
+          {successMsg && <p role="status" className="p-3 rounded-lg border border-emerald-600/40 bg-emerald-500/10 text-emerald-300">{successMsg}</p>}
           {/* Google Sign In Button */}
           <button
             type="button"
@@ -316,10 +308,11 @@ export const TrialModal: React.FC<{
               <input
                 type="password"
                 required
+                minLength={8}
+                autoComplete="new-password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder="At least 6 characters"
-                minLength={6}
+                placeholder="At least 8 characters"
                 className="w-full bg-[#122144] border border-slate-700 rounded-lg px-3.5 py-2 text-white placeholder-slate-400 focus:outline-none focus:border-[#F6C62B]"
               />
             </div>
@@ -331,7 +324,7 @@ export const TrialModal: React.FC<{
                 onChange={e => setGrade(e.target.value)}
                 className="w-full bg-[#122144] border border-slate-700 rounded-lg px-3.5 py-2 text-white focus:outline-none focus:border-[#F6C62B]"
               >
-                <option value="High School">High School (Diversificado / Senior)</option>
+                <option value="High School">High School (Upper Grades / Senior)</option>
                 <option value="Middle School">Middle School / Junior</option>
                 <option value="College">College / University</option>
                 <option value="Professional">Self-learner / Career</option>
@@ -341,7 +334,7 @@ export const TrialModal: React.FC<{
             <div className="p-3 rounded-lg bg-[#080f21] border border-slate-800 text-[11px] text-slate-300 space-y-1">
               <div className="flex items-center gap-1.5 text-[#F6C62B] font-semibold">
                 <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Free 3-Day Trial · Secured by Firebase</span>
+                <span>Free 3-Day Trial · Secured by Netlify Identity</span>
               </div>
               <p>Creates your student account and opens your personal ProLnk Dashboard with unlimited 24/7 AI assistance.</p>
             </div>
@@ -363,9 +356,8 @@ export const TrialModal: React.FC<{
 export const LoginModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
-  onLogin: (name: string, email: string, uid?: string, photoURL?: string) => void;
+  onLogin: (name: string, email: string, uid?: string, photoURL?: string) => void | Promise<void>;
 }> = ({ isOpen, onClose, onLogin }) => {
-  if (!isOpen) return null;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -375,35 +367,24 @@ export const LoginModal: React.FC<{
     setIsLoading(true);
     setErrorMsg(null);
     try {
-      const { signInWithGoogle } = await import('../firebase/authService');
-      const user = await signInWithGoogle();
-      onLogin(user.displayName || user.email?.split('@')[0] || 'Pablo Vettorazzi', user.email || '', user.uid, user.photoURL || undefined);
-      onClose();
-    } catch (err: any) {
-      console.error('Google login error:', err);
-      setErrorMsg(err.message || 'Could not complete Google Sign-in.');
-    } finally {
+      await signInWithGoogle();
+    } catch (error) {
+      setErrorMsg(authErrorMessage(error));
       setIsLoading(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) return;
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (isLoading) return;
     setIsLoading(true);
     setErrorMsg(null);
-
     try {
-      const { loginUserWithEmail } = await import('../firebase/authService');
       const user = await loginUserWithEmail(email, password);
-      onLogin(user.displayName || email.split('@')[0], user.email || email, user.uid);
+      await onLogin(user.name || email.split('@')[0], user.email || email, user.id);
       onClose();
-    } catch (err: any) {
-      console.warn('Firebase login note:', err?.message);
-      // Fallback to local session
-      const name = email.split('@')[0];
-      onLogin(name, email);
-      onClose();
+    } catch (error) {
+      setErrorMsg(authErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
@@ -411,23 +392,18 @@ export const LoginModal: React.FC<{
 
   const handleQuickDemo = async () => {
     setIsLoading(true);
+    setErrorMsg(null);
     try {
-      const { loginUserWithEmail, registerUserWithEmail } = await import('../firebase/authService');
-      let user;
-      try {
-        user = await loginUserWithEmail('pablovettorazzia@hotmail.com', 'prolnkDemo123!');
-      } catch {
-        user = await registerUserWithEmail('Pablo Vettorazzi', 'pablovettorazzia@hotmail.com', 'prolnkDemo123!');
-      }
-      onLogin(user.displayName || 'Pablo Vettorazzi', user.email || 'pablovettorazzia@hotmail.com', user.uid);
+      await onLogin('Pablo Vettorazzi', 'demo@prolnk.example', 'demo');
       onClose();
     } catch {
-      onLogin('Pablo Vettorazzi', 'pablovettorazzia@hotmail.com');
-      onClose();
+      setErrorMsg('The demo could not be opened.');
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
@@ -504,6 +480,7 @@ export const LoginModal: React.FC<{
             <button
               type="button"
               onClick={handleQuickDemo}
+              disabled={isLoading}
               className="w-full py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold cursor-pointer transition-colors"
             >
               Demo Login (Pablo Vettorazzi)

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { Hero } from './components/Hero';
 import { SpeedLadder } from './components/SpeedLadder';
@@ -23,7 +23,7 @@ import { BookingModal, TrialModal, LoginModal, QuestionModal, ContactModal } fro
 import { Expert, ForumPost, DashboardSession } from './types';
 import { EXPERTS_DATA, USER_PAST_SESSIONS, FORUM_POSTS } from './data/mockData';
 import { CheckCircle2, X, LayoutDashboard } from 'lucide-react';
-import { onAuthStatusChange, logoutUser } from './firebase/authService';
+import { onAuthStatusChange, logoutUser, restoreSession } from './services/auth';
 import {
   saveUserProfile,
   getUserProfile,
@@ -32,10 +32,14 @@ import {
   getForumPosts,
   createForumPost,
   updatePostVotes
-} from './firebase/firestoreService';
+} from './services/data';
 
 export interface AuthUser {
   uid?: string;
+  isDemo?: boolean;
+  emailNotifications?: boolean;
+  sessionReminders?: boolean;
+  aiExplanationStyle?: 'detailed' | 'quick';
   name: string;
   email: string;
   photoURL?: string;
@@ -55,9 +59,9 @@ export default function App() {
   // Authentication & View state
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [currentView, setCurrentView] = useState<'landing' | 'dashboard' | 'profile'>('landing');
+  const accountLoadRef = useRef(0);
 
-  // Firestore persistent state
-  const [userSessions, setUserSessions] = useState<DashboardSession[]>(USER_PAST_SESSIONS);
+  const [userSessions, setUserSessions] = useState<DashboardSession[]>([]);
   const [communityPosts, setCommunityPosts] = useState<ForumPost[]>(FORUM_POSTS);
 
   // Modals state
@@ -79,140 +83,75 @@ export default function App() {
     }, 4500);
   };
 
-  // Sync with Firebase Auth and Firestore on mount
-  useEffect(() => {
-    // 1. Fetch community posts from Firestore
-    getForumPosts().then(posts => {
-      if (posts && posts.length > 0) {
-        setCommunityPosts(posts);
-      }
-    }).catch(err => console.warn('Could not fetch Firestore forum posts:', err));
-
-    // 2. Listen to Firebase Auth state
-    const unsubscribe = onAuthStatusChange(async (firebaseUser) => {
-      if (firebaseUser) {
-        try {
-          const profile = await getUserProfile(firebaseUser.uid);
-          const user: AuthUser = {
-            uid: firebaseUser.uid,
-            name: profile?.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Student',
-            email: firebaseUser.email || '',
-            photoURL: profile?.photoURL || firebaseUser.photoURL || undefined,
-            plan: profile?.plan || '3-Day Free Trial',
-            daysLeft: 3,
-            bio: profile?.bio || 'Estudiante universitario enfocado en dominar cálculo y física con apoyo de ProLnk.',
-            university: profile?.university || 'Universidad del Valle de Guatemala',
-            major: profile?.major || 'Ingeniería en Ciencias de la Computación',
-            semester: profile?.semester || '4to Semestre',
-            targetSubjects: profile?.targetSubjects || ['Cálculo Diferencial', 'Física II', 'Álgebra Lineal'],
-            learningGoal: profile?.learningGoal || 'Obtener nota superior a 90 en los exámenes parciales y dominar cálculo multivariable.',
-            streakDays: profile?.streakDays || 5,
-            xpPoints: profile?.xpPoints || 840
-          };
-          setCurrentUser(user);
-
-          // Fetch sessions from Firestore
-          const sessions = await getUserSessions(firebaseUser.uid);
-          if (sessions && sessions.length > 0) {
-            setUserSessions(sessions);
-          }
-        } catch (e) {
-          console.error('Error loading Firestore user data:', e);
-        }
-      } else {
-        // Fallback to localStorage if any
-        try {
-          const stored = localStorage.getItem('prolnk_user');
-          if (stored) {
-            setCurrentUser(JSON.parse(stored));
-          }
-        } catch {}
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  const handleRegisterUser = async (name: string, email: string, uid?: string, photoURL?: string) => {
-    const userUid = uid || `user_${Date.now()}`;
-    const newUser: AuthUser = {
-      uid: userUid,
-      name: name || 'Student',
-      email: email,
-      photoURL,
-      plan: '3-Day Free Trial',
-      daysLeft: 3
-    };
-    setCurrentUser(newUser);
-
-    try {
-      localStorage.setItem('prolnk_user', JSON.stringify(newUser));
-    } catch {}
-
-    // Persist to Firestore
-    await saveUserProfile({
-      id: userUid,
-      name: newUser.name,
-      email: newUser.email,
-      photoURL,
-      plan: newUser.plan,
-      role: 'student',
-      createdAt: new Date().toISOString()
-    });
-    
+  const loadAccount = async () => {
+    const version = ++accountLoadRef.current;
+    const profile = await getUserProfile();
+    if (version !== accountLoadRef.current) throw new Error('Your session has changed. Please try again.');
+    setCurrentUser(profile);
     setCurrentView('dashboard');
-    showToast(`Account created! Welcome to your ProLnk Dashboard, ${newUser.name}.`);
+    setUserSessions([]);
+    try {
+      const sessions = await getUserSessions();
+      if (version === accountLoadRef.current) setUserSessions(sessions);
+    } catch {
+      showToast('Your session history could not be loaded.');
+    }
+    return profile;
   };
 
-  const handleLoginUser = async (name: string, email: string, uid?: string, photoURL?: string) => {
-    const userUid = uid || `user_${Date.now()}`;
-    const user: AuthUser = {
-      uid: userUid,
-      name: name || 'Pablo Vettorazzi',
-      email: email,
-      photoURL,
-      plan: '3-Day Free Trial',
-      daysLeft: 3
-    };
-    setCurrentUser(user);
-
-    try {
-      localStorage.setItem('prolnk_user', JSON.stringify(user));
-    } catch {}
-
-    // Persist / update to Firestore
-    await saveUserProfile({
-      id: userUid,
-      name: user.name,
-      email: user.email,
-      photoURL,
-      plan: user.plan,
-      role: 'student',
-      createdAt: new Date().toISOString()
+  useEffect(() => {
+    let active = true;
+    try { localStorage.removeItem('prolnk_user'); } catch {}
+    getForumPosts().then(posts => {
+      if (active && posts.length > 0) setCommunityPosts(posts);
+    }).catch(() => {});
+    restoreSession().then(async user => {
+      if (active && user?.confirmedAt) await loadAccount();
+    }).catch(() => {
+      if (active) showToast('Your account could not be restored. Please log in again.');
     });
+    const unsubscribe = onAuthStatusChange(() => {
+      if (!active) return;
+      accountLoadRef.current++;
+      setCurrentUser(null);
+      setUserSessions([]);
+      setCurrentView('landing');
+    });
+    return () => { active = false; unsubscribe(); };
+  }, []);
 
-    // Load sessions from Firestore
-    try {
-      const sessions = await getUserSessions(userUid);
-      if (sessions && sessions.length > 0) {
-        setUserSessions(sessions);
-      }
-    } catch {}
+  const handleRegisterUser = async (_name: string, _email: string, uid?: string) => {
+    if (!uid) return;
+    const user = await loadAccount();
+    showToast(`Account created. Welcome, ${user.name}!`);
+  };
 
-    setCurrentView('dashboard');
+  const handleLoginUser = async (name: string, email: string, uid?: string) => {
+    if (uid === 'demo') {
+      if (await restoreSession()) await logoutUser();
+      accountLoadRef.current++;
+      setCurrentUser({ uid: 'demo', name, email, isDemo: true, plan: 'Demo', daysLeft: 3 });
+      setUserSessions(USER_PAST_SESSIONS);
+      setCurrentView('dashboard');
+      showToast('Demo mode: changes are not saved to a real account.');
+      return;
+    }
+    if (!uid) throw new Error('Please log in with your account.');
+    const user = await loadAccount();
     showToast(`Welcome back, ${user.name}!`);
   };
 
   const handleLogOut = async () => {
+    accountLoadRef.current++;
     try {
-      await logoutUser();
-    } catch {}
-    setCurrentUser(null);
-    setCurrentView('landing');
-    try {
-      localStorage.removeItem('prolnk_user');
-    } catch {}
-    showToast('You have logged out.');
+      if (!currentUser?.isDemo) await logoutUser();
+      setCurrentUser(null);
+      setUserSessions([]);
+      setCurrentView('landing');
+      showToast('You have logged out.');
+    } catch {
+      showToast('You could not be logged out. Please try again.');
+    }
   };
 
   const handleBookExpert = (expert: Expert) => {
@@ -235,10 +174,13 @@ export default function App() {
       time: details.date.includes('·') ? details.date.split('·')[1].trim() : 'Scheduled'
     };
 
-    setUserSessions(prev => [newSession, ...prev]);
-
-    if (currentUser?.uid) {
-      await saveUserSession(currentUser.uid, newSession);
+    if (!currentUser) { setLoginModalOpen(true); return; }
+    try {
+      if (!currentUser.isDemo && currentUser.uid) await saveUserSession(currentUser.uid, newSession);
+      setUserSessions(prev => [newSession, ...prev]);
+    } catch {
+      showToast('Your booking could not be saved. Please try again.');
+      return;
     }
 
     showToast(`Session booked with ${details.expertName} for Q${details.total}! Check your email for room link.`);
@@ -260,41 +202,36 @@ export default function App() {
       author: currentUser ? `${currentUser.name} (Student)` : 'Guest Student',
       category,
       repliesCount: 0,
-      votes: 1,
-      userVoted: true,
+      votes: 0,
+      userVoted: false,
       hasExpertAnswer: false,
       previewText: 'Awaiting first community or expert breakdown...',
       timeAgo: 'Just now'
     };
 
-    setCommunityPosts(prev => [newPost, ...prev]);
-
-    const uid = currentUser?.uid || 'guest';
-    await createForumPost(newPost, uid);
+    if (!currentUser) { setLoginModalOpen(true); return; }
+    try {
+      if (!currentUser.isDemo) await createForumPost(newPost, currentUser.uid!);
+      setCommunityPosts(prev => [newPost, ...prev]);
+    } catch {
+      showToast('Your question could not be posted. Please try again.');
+      return;
+    }
 
     showToast(`Your question "${title.substring(0, 30)}..." in ${category} was posted to the community!`);
   };
 
   const handleVoteQuestion = async (postId: string) => {
-    let targetVotes = 0;
-    setCommunityPosts(prev =>
-      prev.map(p => {
-        if (p.id === postId) {
-          const hasVoted = p.userVoted;
-          const nextVotes = hasVoted ? p.votes - 1 : p.votes + 1;
-          targetVotes = nextVotes;
-          return {
-            ...p,
-            votes: nextVotes,
-            userVoted: !hasVoted
-          };
-        }
-        return p;
-      })
-    );
-
-    if (targetVotes > 0) {
-      await updatePostVotes(postId, targetVotes);
+    if (!currentUser) { setLoginModalOpen(true); return; }
+    if (currentUser.isDemo) {
+      setCommunityPosts(posts => posts.map(post => post.id === postId ? { ...post, votes: post.votes + (post.userVoted ? -1 : 1), userVoted: !post.userVoted } : post));
+      return;
+    }
+    try {
+      const result = await updatePostVotes(postId);
+      setCommunityPosts(posts => posts.map(post => post.id === postId ? { ...post, ...result } : post));
+    } catch {
+      showToast('Your vote could not be saved.');
     }
   };
 
@@ -305,32 +242,14 @@ export default function App() {
 
   const handleUpdateProfile = async (updatedData: Partial<AuthUser>) => {
     if (!currentUser) return;
-    const updated: AuthUser = { ...currentUser, ...updatedData };
-    setCurrentUser(updated);
-    try {
-      localStorage.setItem('prolnk_user', JSON.stringify(updated));
-    } catch {}
-
-    if (currentUser.uid) {
-      await saveUserProfile({
-        id: currentUser.uid,
-        name: updated.name,
-        email: updated.email,
-        photoURL: updated.photoURL,
-        plan: updated.plan,
-        role: 'student',
-        createdAt: new Date().toISOString(),
-        bio: updated.bio,
-        university: updated.university,
-        major: updated.major,
-        semester: updated.semester,
-        targetSubjects: updated.targetSubjects,
-        learningGoal: updated.learningGoal,
-        streakDays: updated.streakDays,
-        xpPoints: updated.xpPoints
-      });
+    if (currentUser.isDemo) {
+      setCurrentUser({ ...currentUser, ...updatedData });
+      showToast('Demo profile updated for this visit only.');
+      return;
     }
-    showToast('Your profile has been updated successfully!');
+    const profile = await saveUserProfile(updatedData);
+    setCurrentUser(profile);
+    showToast('Your profile was saved successfully.');
   };
 
   // Dedicated Full-Page Student Profile View (Separate Page with Natural Smooth Scrolling)
@@ -347,11 +266,12 @@ export default function App() {
   }
 
   // If a student is authenticated / has dashboard open, they CANNOT navigate to the landing page
-  // unless they go to their profile section and click "Cerrar Sesión"!
+  // unless they go to their profile section and click "Log Out"!
   if (currentUser) {
     return (
       <>
         <Dashboard
+          key={currentUser.uid}
           user={currentUser}
           sessions={userSessions}
           posts={communityPosts}
