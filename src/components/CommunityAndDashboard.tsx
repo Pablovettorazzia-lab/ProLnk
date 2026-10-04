@@ -40,7 +40,7 @@ export const CommunityAndDashboard: React.FC<CommunityAndDashboardProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   
-  // Comment inputs per post
+  const [showAllPosts, setShowAllPosts] = useState(false);
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -149,6 +149,8 @@ export const CommunityAndDashboard: React.FC<CommunityAndDashboardProps> = ({
     return matchesCategory && matchesSearch;
   });
 
+  const displayedPosts = showAllPosts ? filteredPosts : filteredPosts.slice(0, 2);
+
   return (
     <section id="community" className="py-16 md:py-24 bg-[#0a1329] border-b border-slate-800 relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
@@ -213,7 +215,7 @@ export const CommunityAndDashboard: React.FC<CommunityAndDashboardProps> = ({
 
         {/* Forum Question Cards List */}
         <div className="space-y-4">
-          {filteredPosts.map(post => {
+          {displayedPosts.map(post => {
             const isExpanded = expandedPostId === post.id;
             const comments = post.comments || [];
 
@@ -418,6 +420,19 @@ export const CommunityAndDashboard: React.FC<CommunityAndDashboardProps> = ({
             );
           })}
         </div>
+
+        {/* Toggle to view more or keep couple of examples */}
+        {filteredPosts.length > 2 && (
+          <div className="text-center pt-2">
+            <button
+              type="button"
+              onClick={() => setShowAllPosts(prev => !prev)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0c162e] hover:bg-[#122144] text-slate-200 hover:text-white border border-slate-700/80 hover:border-[#F6C62B]/50 text-xs font-semibold cursor-pointer transition-all shadow"
+            >
+              {showAllPosts ? 'Show featured examples only' : `View more community questions (+${filteredPosts.length - 2} more)`}
+            </button>
+          </div>
+        )}
 
         {/* Part 2: Student Dashboard Preview (Bottom Section) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center pt-8 border-t border-slate-800">

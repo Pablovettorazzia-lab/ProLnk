@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ProLnkLogo } from './Logo';
 import { Expert, ForumPost, ForumComment, DashboardSession } from '../types';
 import { EXPERTS_DATA, FORUM_POSTS, USER_PAST_SESSIONS, AI_PRESET_QUESTIONS } from '../data/mockData';
@@ -49,7 +49,15 @@ import {
   PanelLeftOpen,
   PanelLeft,
   Menu,
-  ChevronLeft
+  ChevronLeft,
+  User,
+  Camera,
+  Edit3,
+  Save,
+  GraduationCap,
+  School,
+  Trophy,
+  Check
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -60,6 +68,14 @@ interface DashboardProps {
     photoURL?: string;
     plan: string;
     daysLeft: number;
+    bio?: string;
+    university?: string;
+    major?: string;
+    semester?: string;
+    targetSubjects?: string[];
+    learningGoal?: string;
+    streakDays?: number;
+    xpPoints?: number;
   };
   sessions?: DashboardSession[];
   posts?: ForumPost[];
@@ -67,6 +83,8 @@ interface DashboardProps {
   onLogOut: () => void;
   onViewLandingPage: () => void;
   onBookExpert: (expert: Expert) => void;
+  onUpdateProfile?: (updated: Partial<DashboardProps['user']>) => void;
+  onOpenProfile?: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -76,12 +94,86 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onVotePost,
   onLogOut,
   onViewLandingPage,
-  onBookExpert
+  onBookExpert,
+  onUpdateProfile,
+  onOpenProfile
 }) => {
-  const [activeTab, setActiveTab] = useState<'home' | 'ai-chat' | 'tutors' | 'sessions' | 'community' | 'notes' | 'settings'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'ai-chat' | 'tutors' | 'sessions' | 'community' | 'notes' | 'profile' | 'settings'>('home');
   const [notesSubTab, setNotesSubTab] = useState<'canvas' | 'downloads'>('canvas');
   const [searchQuery, setSearchQuery] = useState('');
   const [dashboardToast, setDashboardToast] = useState<string | null>(null);
+
+  // Profile edit states
+  const [profileName, setProfileName] = useState(user.name || '');
+  const [profileBio, setProfileBio] = useState(user.bio || 'Estudiante universitario apasionado por dominar cálculo y materias STEM con apoyo de ProLnk.');
+  const [profileUniversity, setProfileUniversity] = useState(user.university || 'Universidad del Valle de Guatemala');
+  const [profileMajor, setProfileMajor] = useState(user.major || 'Ingeniería en Ciencias de la Computación');
+  const [profileSemester, setProfileSemester] = useState(user.semester || '4to Semestre');
+  const [profileLearningGoal, setProfileLearningGoal] = useState(user.learningGoal || 'Dominar derivadas e integrales y mantener promedio superior a 90.');
+  const [profilePhotoURL, setProfilePhotoURL] = useState(user.photoURL || '');
+  const [profileSubjects, setProfileSubjects] = useState<string[]>(
+    user.targetSubjects && user.targetSubjects.length > 0
+      ? user.targetSubjects
+      : ['Cálculo Multivariable', 'Física II', 'Álgebra Lineal']
+  );
+  const [newSubjectInput, setNewSubjectInput] = useState('');
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const PRESET_AVATARS = [
+    { id: 'av1', label: 'Estudiante Tech', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80' },
+    { id: 'av2', label: 'Ingeniero', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=250&q=80' },
+    { id: 'av3', label: 'Científica', url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=250&q=80' },
+    { id: 'av4', label: 'Académico', url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=250&q=80' },
+    { id: 'av5', label: 'Matemática', url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=250&q=80' },
+  ];
+  const [profileSubTab, setProfileSubTab] = useState<'info' | 'achievements' | 'preferences'>('info');
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [aiExplanationStyle, setAiExplanationStyle] = useState<'detailed' | 'quick'>('detailed');
+
+  // Sync profile state when user prop updates
+  useEffect(() => {
+    if (user.name) setProfileName(user.name);
+    if (user.bio) setProfileBio(user.bio);
+    if (user.university) setProfileUniversity(user.university);
+    if (user.major) setProfileMajor(user.major);
+    if (user.semester) setProfileSemester(user.semester);
+    if (user.learningGoal) setProfileLearningGoal(user.learningGoal);
+    if (user.photoURL) setProfilePhotoURL(user.photoURL);
+    if (user.targetSubjects) setProfileSubjects(user.targetSubjects);
+  }, [user]);
+
+  const handleSaveProfile = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!profileName.trim()) return;
+
+    if (onUpdateProfile) {
+      onUpdateProfile({
+        name: profileName.trim(),
+        bio: profileBio.trim(),
+        university: profileUniversity.trim(),
+        major: profileMajor.trim(),
+        semester: profileSemester.trim(),
+        learningGoal: profileLearningGoal.trim(),
+        photoURL: profilePhotoURL || undefined,
+        targetSubjects: profileSubjects
+      });
+    }
+
+    showDashboardToast('¡Perfil guardado y sincronizado con éxito! 🎉');
+  };
+
+  const handleAddSubject = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSubjectInput.trim()) return;
+    const clean = newSubjectInput.trim();
+    if (!profileSubjects.includes(clean)) {
+      setProfileSubjects(prev => [...prev, clean]);
+    }
+    setNewSubjectInput('');
+  };
+
+  const handleRemoveSubject = (subj: string) => {
+    setProfileSubjects(prev => prev.filter(s => s !== subj));
+  };
 
   // Collapsible sidebar state with local storage persistence
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
@@ -92,6 +184,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   });
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const chatLogEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (activeTab === 'ai-chat') {
+      chatLogEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [activeTab]);
 
   const toggleSidebar = () => {
     setSidebarCollapsed(prev => {
@@ -393,23 +492,46 @@ export const Dashboard: React.FC<DashboardProps> = ({
           }
         ]);
         setIsAiThinking(false);
+        setTimeout(() => chatLogEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
         return;
       }
     } catch {
-      // Fallback
+      // Fallback below
     }
 
     setTimeout(() => {
-      let answer = 'Step-by-step resolution:\n1. Identify known components and establish initial conditions.\n2. Apply the fundamental formula and simplify algebraic terms.\n3. Verify edge boundaries and units.';
+      const lower = userText.toLowerCase();
+      const isSpanish = /[áéíóúñ¿¡]/.test(lower) || lower.includes('como') || lower.includes('cual') || lower.includes('qué') || lower.includes('derivad') || lower.includes('física') || lower.includes('química') || lower.includes('resolver') || lower.includes('explic');
+
+      let answer = isSpanish
+        ? 'Resolución académica paso a paso:\n1. Identifica los parámetros conocidos y establece las condiciones iniciales.\n2. Aplica el teorema o fórmula correspondiente y simplifica términos algebraicos.\n3. Verifica el resultado y sus unidades.'
+        : 'Step-by-step academic resolution:\n1. Identify known parameters and establish initial conditions.\n2. Apply the fundamental theorem or formula and simplify terms.\n3. Verify validity, dimensions, and boundary units.';
       let source = 'OpenStax College Science & Math Standards';
 
-      const lower = userText.toLowerCase();
-      if (lower.includes('derivative') || lower.includes('calculus') || lower.includes('integral')) {
-        answer = 'For this calculus problem:\n1. Apply implicit differentiation or the chain rule d/dx [f(g(x))] = f\'(g(x)) · g\'(x).\n2. Factor out the common derivative terms.\n3. Solve for dy/dx and test against known polynomial properties.';
-        source = 'Stewart Calculus (8th Ed), Chapter 3';
-      } else if (lower.includes('physics') || lower.includes('force') || lower.includes('energy')) {
-        answer = 'Physics solution breakdown:\n1. Draw coordinate axes and set upward/rightward as positive.\n2. Apply conservation of mechanical energy: E_initial = E_final.\n3. Account for friction loss W_f = f_k · d if applicable.';
-        source = 'Giancoli Physics: Principles with Applications (7th Ed)';
+      if (lower.includes('derivad') || lower.includes('calcul') || lower.includes('integral') || lower.includes('derivative')) {
+        if (isSpanish) {
+          answer = 'Solución de cálculo paso a paso:\n1. Aplica la regla diferencial adecuada (regla de la cadena d/dx[f(g(x))] = f\'(g(x))·g\'(x) o integración por partes).\n2. Factoriza los términos diferenciales comunes.\n3. Despeja dy/dx y verifica con las propiedades algebraicas.';
+          source = 'Stewart Cálculo: Trascendentes Tempranas (8va Ed), Capítulo 3';
+        } else {
+          answer = 'Calculus problem breakdown:\n1. Apply implicit differentiation or the chain rule d/dx [f(g(x))] = f\'(g(x)) · g\'(x).\n2. Factor out the common derivative terms.\n3. Solve for dy/dx and test against known polynomial properties.';
+          source = 'Stewart Calculus (8th Ed), Chapter 3';
+        }
+      } else if (lower.includes('físic') || lower.includes('fuerza') || lower.includes('energ') || lower.includes('physics') || lower.includes('force')) {
+        if (isSpanish) {
+          answer = 'Desglose de física paso a paso:\n1. Dibuja el diagrama de cuerpo libre (DCL) y define la convención de signos.\n2. Aplica la conservación de energía mecánica E_inicial = E_final o ΣF = m·a.\n3. Calcula el trabajo de rozamiento W_f = μ·N·d si corresponde.';
+          source = 'Giancoli Física: Principios con Aplicaciones (7ma Ed), Capítulo 4';
+        } else {
+          answer = 'Physics solution breakdown:\n1. Draw coordinate axes and set upward/rightward as positive.\n2. Apply conservation of mechanical energy: E_initial = E_final.\n3. Account for friction loss W_f = f_k · d if applicable.';
+          source = 'Giancoli Physics: Principles with Applications (7th Ed)';
+        }
+      } else if (lower.includes('químic') || lower.includes('chemistry') || lower.includes('reaccion') || lower.includes('molecul')) {
+        if (isSpanish) {
+          answer = 'Solución de química paso a paso:\n1. Balancea la ecuación estequiométrica asegurando conservación de masa.\n2. Convierte las masas a moles (n = m/M) y encuentra el reactivo limitante.\n3. Calcula el rendimiento teórico del producto.';
+          source = 'Chang Química General (12va Ed), Capítulo 3';
+        } else {
+          answer = 'Chemistry solution breakdown:\n1. Balance the chemical reaction to conserve moles.\n2. Convert mass to moles (n = m/M) and identify the limiting reactant.\n3. Compute theoretical yield and apply ideal gas law (PV = nRT) if applicable.';
+          source = 'Chang General Chemistry (12th Ed), Chapter 3';
+        }
       }
 
       setAiChatMessages(prev => [
@@ -417,7 +539,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
         { id: Date.now() + '-a', sender: 'ai', text: answer, source }
       ]);
       setIsAiThinking(false);
-    }, 150);
+      setTimeout(() => chatLogEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+    }, 100);
   };
 
   const handleVote = (id: string) => {
@@ -430,7 +553,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-[#070d1c] text-slate-100 flex flex-col md:flex-row antialiased relative">
+    <div className="h-screen max-h-screen overflow-hidden bg-[#070d1c] text-slate-100 flex flex-col md:flex-row antialiased relative">
       
       {/* Mobile Drawer Backdrop */}
       {mobileSidebarOpen && (
@@ -448,7 +571,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <button
                   onClick={() => setMobileSidebarOpen(false)}
                   className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
-                  title="Cerrar menú"
+                  title="Close menu"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -462,10 +585,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   { id: 'sessions', label: 'My Sessions', icon: Calendar, color: 'text-purple-400' },
                   { id: 'community', label: 'Community Q&A', icon: MessageSquare, color: 'text-amber-400' },
                   { id: 'notes', label: 'Whiteboard Notes', icon: FileText, color: 'text-teal-400' },
+                  { id: 'profile', label: 'My Profile', icon: User, color: 'text-emerald-400', badge: 'You' },
                 ].map(item => (
                   <button
                     key={item.id}
                     onClick={() => {
+                      if (item.id === 'profile' && onOpenProfile) {
+                        onOpenProfile();
+                        setMobileSidebarOpen(false);
+                        return;
+                      }
                       setActiveTab(item.id as any);
                       setMobileSidebarOpen(false);
                     }}
@@ -490,72 +619,60 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             <div className="p-3 border-t border-slate-800 space-y-3">
-              <div className="flex items-center gap-3 p-2 rounded-xl bg-[#080f21] border border-slate-800">
-                {user.photoURL ? (
-                  <img src={user.photoURL} alt={user.name} className="w-8 h-8 rounded-full object-cover border border-[#F6C62B]/40" />
+              <div
+                onClick={() => {
+                  if (onOpenProfile) onOpenProfile();
+                  setMobileSidebarOpen(false);
+                }}
+                className="flex items-center gap-3 p-2 rounded-xl bg-[#080f21] border border-slate-800 hover:border-[#F6C62B]/50 cursor-pointer transition-colors"
+                title="View my profile"
+              >
+                {profilePhotoURL ? (
+                  <img src={profilePhotoURL} alt={profileName} className="w-8 h-8 rounded-full object-cover border border-[#F6C62B]/40" />
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-[#0F2249] border border-[#F6C62B] text-white font-bold text-xs flex items-center justify-center">
-                    {user.name.split(' ').map(n => n[0]).join('').substring(0, 2) || 'U'}
+                    {profileName.split(' ').map(n => n[0]).join('').substring(0, 2) || 'U'}
                   </div>
                 )}
                 <div className="overflow-hidden flex-1">
-                  <div className="text-xs font-bold text-white truncate">{user.name}</div>
-                  <div className="text-[10px] text-emerald-400">Firebase Synced</div>
+                  <div className="text-xs font-bold text-white truncate">{profileName}</div>
+                  <div className="text-[10px] text-emerald-400">View & edit profile →</div>
                 </div>
               </div>
               <button
-                onClick={onLogOut}
-                className="w-full py-2 rounded-lg bg-slate-800 hover:bg-rose-950/40 text-slate-300 hover:text-rose-300 text-xs font-semibold flex items-center justify-center gap-2 border border-slate-700 transition-colors"
+                onClick={() => {
+                  if (onOpenProfile) onOpenProfile();
+                  setMobileSidebarOpen(false);
+                }}
+                className="w-full py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center justify-center gap-2 border border-slate-700 transition-colors"
               >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>Log out</span>
+                <User className="w-3.5 h-3.5 text-[#F6C62B]" />
+                <span>My Student Profile</span>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Left Sidebar - Collapsible / Saveable Desktop Sidebar */}
+      {/* Left Sidebar - Completely Fixed and Stationary When Scrolling */}
       <aside
-        className={`hidden md:flex flex-col justify-between bg-[#0a1329] border-r border-slate-800 shrink-0 transition-all duration-300 ${
+        className={`hidden md:flex flex-col justify-between bg-[#0a1329] border-r border-slate-800 shrink-0 h-screen sticky top-0 z-30 transition-all duration-300 overflow-y-auto overflow-x-hidden ${
           sidebarCollapsed ? 'w-20' : 'w-64'
         }`}
       >
         <div>
-          {/* Logo brand & Collapsible Button */}
-          <div className={`p-4 border-b border-slate-800 flex items-center ${sidebarCollapsed ? 'justify-center flex-col gap-2' : 'justify-between'}`}>
+          {/* Logo brand (clean top header without collapse button) */}
+          <div className={`p-4 border-b border-slate-800 flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
             {!sidebarCollapsed ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <ProLnkLogo size="sm" light={true} showWordmark={true} />
-                  <span className="text-[10px] font-bold bg-[#F6C62B]/20 text-[#F6C62B] px-2 py-0.5 rounded-full uppercase tracking-wider">
-                    Portal
-                  </span>
-                </div>
-                <button
-                  onClick={toggleSidebar}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-[#F6C62B] hover:bg-slate-800 transition-colors cursor-pointer"
-                  title="Guardar / Colapsar menú lateral"
-                >
-                  <PanelLeftClose className="w-4 h-4" />
-                </button>
-              </>
+              <div className="flex items-center gap-2">
+                <ProLnkLogo size="sm" light={true} showWordmark={true} />
+                <span className="text-[10px] font-bold bg-[#F6C62B]/20 text-[#F6C62B] px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  Portal
+                </span>
+              </div>
             ) : (
-              <div className="flex flex-col items-center gap-2">
-                <button
-                  onClick={toggleSidebar}
-                  className="p-1.5 rounded-xl bg-[#080f21] hover:bg-slate-800 border border-slate-800 hover:border-[#F6C62B]/50 transition-all cursor-pointer flex items-center justify-center shadow-sm"
-                  title="Desplegar menú lateral completo"
-                >
-                  <ProLnkLogo size="sm" light={true} showWordmark={false} />
-                </button>
-                <button
-                  onClick={toggleSidebar}
-                  className="p-1 rounded-lg text-slate-400 hover:text-[#F6C62B] hover:bg-slate-800/80 transition-colors cursor-pointer"
-                  title="Desplegar menú lateral completo"
-                >
-                  <PanelLeftOpen className="w-3.5 h-3.5" />
-                </button>
+              <div className="p-1.5 rounded-xl bg-[#080f21] border border-slate-800 flex items-center justify-center shadow-sm">
+                <ProLnkLogo size="sm" light={true} showWordmark={false} />
               </div>
             )}
           </div>
@@ -569,12 +686,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
               { id: 'sessions', label: 'My Sessions', icon: Calendar, color: 'text-purple-400' },
               { id: 'community', label: 'Community Q&A', icon: MessageSquare, color: 'text-amber-400' },
               { id: 'notes', label: 'Whiteboard Notes', icon: FileText, color: 'text-teal-400' },
+              { id: 'profile', label: 'My Profile', icon: User, color: 'text-emerald-400', badge: 'You' },
             ].map(item => {
               const isActive = activeTab === item.id;
               return (
                 <button
                   key={item.id}
-                  onClick={() => setActiveTab(item.id as any)}
+                  onClick={() => {
+                    if (item.id === 'profile' && onOpenProfile) {
+                      onOpenProfile();
+                      return;
+                    }
+                    setActiveTab(item.id as any);
+                  }}
                   title={item.label}
                   className={`w-full flex items-center transition-all cursor-pointer rounded-xl ${
                     sidebarCollapsed
@@ -613,86 +737,76 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className={`border-t border-slate-800 ${sidebarCollapsed ? 'p-2' : 'p-4'} space-y-3`}>
           {!sidebarCollapsed ? (
             <>
-              <div className="p-3 rounded-xl bg-[#080f21] border border-slate-800 flex items-center gap-3">
-                {user.photoURL ? (
-                  <img src={user.photoURL} alt={user.name} className="w-9 h-9 rounded-full object-cover shrink-0 border border-[#F6C62B]/50" />
+              <div
+                onClick={() => {
+                  if (onOpenProfile) onOpenProfile();
+                }}
+                className="p-3 rounded-xl bg-[#080f21] border border-slate-800 hover:border-[#F6C62B]/50 flex items-center gap-3 cursor-pointer transition-all group"
+                title="Open My Profile"
+              >
+                {profilePhotoURL ? (
+                  <img src={profilePhotoURL} alt={profileName} className="w-9 h-9 rounded-full object-cover shrink-0 border border-[#F6C62B]/50 group-hover:scale-105 transition-transform" />
                 ) : (
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#0F2249] to-[#F6C62B] text-white font-bold flex items-center justify-center text-xs shrink-0">
-                    {user.name.split(' ').map(n => n[0]).join('') || 'U'}
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#0F2249] to-[#F6C62B] text-white font-bold flex items-center justify-center text-xs shrink-0 group-hover:scale-105 transition-transform">
+                    {profileName.split(' ').map(n => n[0]).join('') || 'U'}
                   </div>
                 )}
                 <div className="overflow-hidden flex-1">
-                  <div className="text-xs font-bold text-white truncate">{user.name}</div>
-                  <div className="text-[10px] text-emerald-400 font-medium">Synced with Firebase</div>
+                  <div className="text-xs font-bold text-white truncate group-hover:text-[#F6C62B] transition-colors">{profileName}</div>
+                  <div className="text-[10px] text-emerald-400 font-medium">My Student Profile →</div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between text-xs pt-1">
-                <button
-                  onClick={onViewLandingPage}
-                  className="text-slate-400 hover:text-[#F6C62B] flex items-center gap-1 cursor-pointer transition-colors"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Landing Page</span>
-                </button>
-                <button
-                  onClick={onLogOut}
-                  className="text-slate-400 hover:text-rose-400 flex items-center gap-1 cursor-pointer transition-colors"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>Log out</span>
-                </button>
-              </div>
-
-              {/* Bottom toggle / guardar button */}
+              {/* Bottom toggle / collapse button */}
               <button
                 onClick={toggleSidebar}
                 className="w-full py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white border border-slate-700 text-xs font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
               >
                 <PanelLeftClose className="w-3.5 h-3.5 text-[#F6C62B]" />
-                <span>Guardar menú lateral</span>
+                <span>Collapse Sidebar</span>
               </button>
             </>
           ) : (
             <div className="flex flex-col items-center gap-2">
-              {user.photoURL ? (
-                <img src={user.photoURL} alt={user.name} className="w-9 h-9 rounded-full object-cover border border-[#F6C62B]/50" title={user.name} />
-              ) : (
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#0F2249] to-[#F6C62B] text-white font-bold flex items-center justify-center text-xs" title={user.name}>
-                  {user.name.split(' ').map(n => n[0]).join('').substring(0, 2) || 'U'}
-                </div>
-              )}
+              <button
+                onClick={() => {
+                  if (onOpenProfile) onOpenProfile();
+                }}
+                className="p-0.5 rounded-full hover:ring-2 hover:ring-[#F6C62B] transition-all cursor-pointer"
+                title={`My Profile (${profileName})`}
+              >
+                {profilePhotoURL ? (
+                  <img src={profilePhotoURL} alt={profileName} className="w-9 h-9 rounded-full object-cover border border-[#F6C62B]/50" />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#0F2249] to-[#F6C62B] text-white font-bold flex items-center justify-center text-xs">
+                    {profileName.split(' ').map(n => n[0]).join('').substring(0, 2) || 'U'}
+                  </div>
+                )}
+              </button>
               <button
                 onClick={toggleSidebar}
                 className="p-2 rounded-xl text-slate-400 hover:text-[#F6C62B] hover:bg-slate-800 transition-colors cursor-pointer"
-                title="Desplegar menú lateral"
+                title="Expand Sidebar"
               >
                 <PanelLeftOpen className="w-4 h-4" />
-              </button>
-              <button
-                onClick={onLogOut}
-                className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
-                title="Cerrar sesión"
-              >
-                <LogOut className="w-4 h-4" />
               </button>
             </div>
           )}
         </div>
       </aside>
 
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+      {/* Main Content Area - Scrollable Independently */}
+      <main className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto overflow-x-hidden">
         
-        {/* Top bar matching mockup with sidebar toggle */}
-        <header className="h-16 bg-[#0a1329]/90 border-b border-slate-800 px-4 sm:px-6 flex items-center justify-between gap-3 sticky top-0 z-30 backdrop-blur-md">
+        {/* Top bar matching mockup */}
+        <header className="h-16 bg-[#0a1329]/90 border-b border-slate-800 px-4 sm:px-6 flex items-center justify-between gap-3 sticky top-0 z-20 backdrop-blur-md shrink-0">
           
           <div className="flex items-center gap-2 flex-1 max-w-xl">
             {/* Mobile menu button */}
             <button
               onClick={() => setMobileSidebarOpen(true)}
               className="md:hidden p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-700 transition-colors cursor-pointer shrink-0"
-              title="Abrir menú"
+              title="Open Menu"
             >
               <Menu className="w-4 h-4 text-[#F6C62B]" />
             </button>
@@ -710,7 +824,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <button
               onClick={() => setActiveTab('ai-chat')}
               className="px-3.5 py-1.5 rounded-full bg-[#F6C62B] text-slate-950 font-bold text-xs hover:bg-[#ffd744] transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm shrink-0"
@@ -718,11 +832,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <Sparkles className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Ask AI Tutor</span>
             </button>
+            {/* Direct Profile Access */}
             <button
-              onClick={onViewLandingPage}
-              className="hidden sm:inline-flex text-xs font-semibold text-slate-300 hover:text-white px-3 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 transition-colors"
+              onClick={() => {
+                if (onOpenProfile) onOpenProfile();
+              }}
+              className="flex items-center gap-2 p-1 pl-2 pr-3 rounded-full border border-slate-700/80 bg-[#122144] hover:bg-[#192f5e] text-slate-200 transition-all cursor-pointer shadow-sm hover:scale-102"
+              title="My Student Profile"
             >
-              Home View
+              {profilePhotoURL ? (
+                <img src={profilePhotoURL} alt={profileName} className="w-6 h-6 rounded-full object-cover border border-[#F6C62B]" />
+              ) : (
+                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#0F2249] to-[#F6C62B] text-white font-bold text-[10px] flex items-center justify-center">
+                  {profileName.split(' ').map(n => n[0]).join('').substring(0, 2) || 'U'}
+                </div>
+              )}
+              <span className="text-xs font-semibold hidden sm:inline">{profileName.split(' ')[0]}</span>
             </button>
           </div>
         </header>
@@ -1402,6 +1527,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <span className="text-[11px] ml-1">Solving with academic sources...</span>
                   </div>
                 )}
+                <div ref={chatLogEndRef} />
               </div>
 
               {/* Quick Preset Prompts */}

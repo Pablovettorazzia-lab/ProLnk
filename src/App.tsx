@@ -18,6 +18,7 @@ import { FAQ } from './components/FAQ';
 import { CtaBanner } from './components/CtaBanner';
 import { Footer } from './components/Footer';
 import { Dashboard } from './components/Dashboard';
+import { ProfilePage } from './components/ProfilePage';
 import { BookingModal, TrialModal, LoginModal, QuestionModal, ContactModal } from './components/Modals';
 import { Expert, ForumPost, DashboardSession } from './types';
 import { EXPERTS_DATA, USER_PAST_SESSIONS, FORUM_POSTS } from './data/mockData';
@@ -33,19 +34,27 @@ import {
   updatePostVotes
 } from './firebase/firestoreService';
 
-interface AuthUser {
+export interface AuthUser {
   uid?: string;
   name: string;
   email: string;
   photoURL?: string;
   plan: string;
   daysLeft: number;
+  bio?: string;
+  university?: string;
+  major?: string;
+  semester?: string;
+  targetSubjects?: string[];
+  learningGoal?: string;
+  streakDays?: number;
+  xpPoints?: number;
 }
 
 export default function App() {
   // Authentication & View state
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
-  const [currentView, setCurrentView] = useState<'landing' | 'dashboard'>('landing');
+  const [currentView, setCurrentView] = useState<'landing' | 'dashboard' | 'profile'>('landing');
 
   // Firestore persistent state
   const [userSessions, setUserSessions] = useState<DashboardSession[]>(USER_PAST_SESSIONS);
@@ -88,9 +97,17 @@ export default function App() {
             uid: firebaseUser.uid,
             name: profile?.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Student',
             email: firebaseUser.email || '',
-            photoURL: firebaseUser.photoURL || undefined,
+            photoURL: profile?.photoURL || firebaseUser.photoURL || undefined,
             plan: profile?.plan || '3-Day Free Trial',
-            daysLeft: 3
+            daysLeft: 3,
+            bio: profile?.bio || 'Estudiante universitario enfocado en dominar cálculo y física con apoyo de ProLnk.',
+            university: profile?.university || 'Universidad del Valle de Guatemala',
+            major: profile?.major || 'Ingeniería en Ciencias de la Computación',
+            semester: profile?.semester || '4to Semestre',
+            targetSubjects: profile?.targetSubjects || ['Cálculo Diferencial', 'Física II', 'Álgebra Lineal'],
+            learningGoal: profile?.learningGoal || 'Obtener nota superior a 90 en los exámenes parciales y dominar cálculo multivariable.',
+            streakDays: profile?.streakDays || 5,
+            xpPoints: profile?.xpPoints || 840
           };
           setCurrentUser(user);
 
@@ -286,8 +303,52 @@ export default function App() {
     if (el) el.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // If in Dashboard view, render the dedicated Student App Portal matching prueba de captura.jpeg
-  if (currentView === 'dashboard' && currentUser) {
+  const handleUpdateProfile = async (updatedData: Partial<AuthUser>) => {
+    if (!currentUser) return;
+    const updated: AuthUser = { ...currentUser, ...updatedData };
+    setCurrentUser(updated);
+    try {
+      localStorage.setItem('prolnk_user', JSON.stringify(updated));
+    } catch {}
+
+    if (currentUser.uid) {
+      await saveUserProfile({
+        id: currentUser.uid,
+        name: updated.name,
+        email: updated.email,
+        photoURL: updated.photoURL,
+        plan: updated.plan,
+        role: 'student',
+        createdAt: new Date().toISOString(),
+        bio: updated.bio,
+        university: updated.university,
+        major: updated.major,
+        semester: updated.semester,
+        targetSubjects: updated.targetSubjects,
+        learningGoal: updated.learningGoal,
+        streakDays: updated.streakDays,
+        xpPoints: updated.xpPoints
+      });
+    }
+    showToast('Your profile has been updated successfully!');
+  };
+
+  // Dedicated Full-Page Student Profile View (Separate Page with Natural Smooth Scrolling)
+  if (currentView === 'profile' && currentUser) {
+    return (
+      <ProfilePage
+        user={currentUser}
+        onBackToDashboard={() => setCurrentView('dashboard')}
+        onViewLandingPage={() => {}}
+        onLogOut={handleLogOut}
+        onUpdateProfile={handleUpdateProfile}
+      />
+    );
+  }
+
+  // If a student is authenticated / has dashboard open, they CANNOT navigate to the landing page
+  // unless they go to their profile section and click "Cerrar Sesión"!
+  if (currentUser) {
     return (
       <>
         <Dashboard
@@ -296,8 +357,10 @@ export default function App() {
           posts={communityPosts}
           onVotePost={handleVoteQuestion}
           onLogOut={handleLogOut}
-          onViewLandingPage={() => setCurrentView('landing')}
+          onViewLandingPage={() => {}}
           onBookExpert={handleBookExpert}
+          onUpdateProfile={handleUpdateProfile}
+          onOpenProfile={() => setCurrentView('profile')}
         />
 
         {/* Modals in dashboard */}
@@ -383,11 +446,11 @@ export default function App() {
         {/* About ProLnk, Mission, Vision, Values, History & Team */}
         <AboutAndTeam />
 
-        {/* FAQ & Privacy/Terms */}
-        <FAQ />
-
-        {/* 3-Day Free Trial Banner */}
+        {/* 3-Day Free Trial Banner (Start your free 3 day trial) */}
         <CtaBanner onSuccessSubmit={(email) => handleRegisterUser(email.split('@')[0], email)} />
+
+        {/* FAQ (Questions students ask us) & Privacy/Terms */}
+        <FAQ />
       </main>
 
       {/* Footer */}

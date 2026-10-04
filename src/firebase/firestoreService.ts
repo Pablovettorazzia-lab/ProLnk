@@ -20,6 +20,14 @@ export interface UserProfileData {
   plan: string;
   role: 'student' | 'tutor' | 'admin';
   createdAt: string;
+  bio?: string;
+  university?: string;
+  major?: string;
+  semester?: string;
+  targetSubjects?: string[];
+  learningGoal?: string;
+  streakDays?: number;
+  xpPoints?: number;
 }
 
 // Utility to remove any undefined keys so Firestore doesn't throw unsupported field value error

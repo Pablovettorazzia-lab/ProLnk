@@ -10,6 +10,7 @@ interface ExpertDirectoryProps {
 export const ExpertDirectory: React.FC<ExpertDirectoryProps> = ({ onBookExpert }) => {
   const [selectedCategory, setSelectedCategory] = useState<SubjectCategory>('all');
   const [flippedCards, setFlippedCards] = useState<Record<string, boolean>>({});
+  const [showAllExperts, setShowAllExperts] = useState(false);
 
   const toggleFlip = (id: string) => {
     setFlippedCards(prev => ({
@@ -22,6 +23,8 @@ export const ExpertDirectory: React.FC<ExpertDirectoryProps> = ({ onBookExpert }
     if (selectedCategory === 'all') return true;
     return exp.category === selectedCategory;
   });
+
+  const displayedExperts = showAllExperts ? filteredExperts : filteredExperts.slice(0, 2);
 
   const categories = [
     { id: 'all', label: 'All subjects' },
@@ -64,8 +67,8 @@ export const ExpertDirectory: React.FC<ExpertDirectoryProps> = ({ onBookExpert }
         </div>
 
         {/* Experts Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredExperts.map(expert => {
+        <div className={`grid gap-6 ${showAllExperts ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto'}`}>
+          {displayedExperts.map(expert => {
             const isFlipped = !!flippedCards[expert.id];
 
             return (
@@ -217,6 +220,19 @@ export const ExpertDirectory: React.FC<ExpertDirectoryProps> = ({ onBookExpert }
             );
           })}
         </div>
+
+        {/* View more / collapse toggle */}
+        {filteredExperts.length > 2 && (
+          <div className="mt-8 text-center">
+            <button
+              type="button"
+              onClick={() => setShowAllExperts(prev => !prev)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0c162e] hover:bg-[#122144] text-slate-200 hover:text-white border border-slate-700/80 hover:border-[#F6C62B]/50 text-xs font-semibold cursor-pointer transition-all shadow"
+            >
+              {showAllExperts ? 'Show featured examples only' : `View more verified tutors (+${filteredExperts.length - 2} more)`}
+            </button>
+          </div>
+        )}
 
         {/* Bottom Guarantee Banner */}
         <div className="mt-12 bg-gradient-to-r from-[#0e1b3d] to-[#122144] border border-[#F6C62B]/30 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-6">
