@@ -220,7 +220,7 @@ export const TrialModal: React.FC<{
     try {
       const user = await registerUserWithEmail(name.trim() || email.split('@')[0], email, password);
       if (!user.confirmedAt) {
-        setSuccessMsg('Cuenta creada. Revisa tu correo y confirma tu dirección para iniciar sesión.');
+        setSuccessMsg('Account created. Check your email and confirm your address to log in.');
         setPassword('');
         return;
       }
@@ -324,7 +324,7 @@ export const TrialModal: React.FC<{
                 onChange={e => setGrade(e.target.value)}
                 className="w-full bg-[#122144] border border-slate-700 rounded-lg px-3.5 py-2 text-white focus:outline-none focus:border-[#F6C62B]"
               >
-                <option value="High School">High School (Diversificado / Senior)</option>
+                <option value="High School">High School (Upper Grades / Senior)</option>
                 <option value="Middle School">Middle School / Junior</option>
                 <option value="College">College / University</option>
                 <option value="Professional">Self-learner / Career</option>
@@ -397,7 +397,7 @@ export const LoginModal: React.FC<{
       await onLogin('Pablo Vettorazzi', 'demo@prolnk.example', 'demo');
       onClose();
     } catch {
-      setErrorMsg('No se pudo abrir la demo.');
+      setErrorMsg('The demo could not be opened.');
     } finally {
       setIsLoading(false);
     }

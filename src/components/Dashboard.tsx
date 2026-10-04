@@ -123,11 +123,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [newSubjectInput, setNewSubjectInput] = useState('');
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const PRESET_AVATARS = [
-    { id: 'av1', label: 'Estudiante Tech', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80' },
-    { id: 'av2', label: 'Ingeniero', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=250&q=80' },
-    { id: 'av3', label: 'Científica', url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=250&q=80' },
-    { id: 'av4', label: 'Académico', url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=250&q=80' },
-    { id: 'av5', label: 'Matemática', url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=250&q=80' },
+    { id: 'av1', label: 'Tech Student', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80' },
+    { id: 'av2', label: 'Engineer', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=250&q=80' },
+    { id: 'av3', label: 'Scientist', url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=250&q=80' },
+    { id: 'av4', label: 'Scholar', url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=250&q=80' },
+    { id: 'av5', label: 'Mathematician', url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=250&q=80' },
   ];
   const [profileSubTab, setProfileSubTab] = useState<'info' | 'achievements' | 'preferences'>('info');
   const [emailNotifications, setEmailNotifications] = useState(user.emailNotifications ?? true);
@@ -162,9 +162,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
         emailNotifications,
         aiExplanationStyle,
       });
-      showDashboardToast(user.isDemo ? 'Perfil demo actualizado durante esta visita.' : 'Perfil guardado correctamente.');
+      showDashboardToast(user.isDemo ? 'Demo profile updated for this visit only.' : 'Profile saved successfully.');
     } catch (error) {
-      showDashboardToast(error instanceof Error ? error.message : 'No se pudo guardar el perfil.');
+      showDashboardToast(error instanceof Error ? error.message : 'Your profile could not be saved.');
     }
   };
 
@@ -207,7 +207,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       } catch {
         // ignore
       }
-      showDashboardToast(next ? 'Menú lateral guardado (vista compacta)' : 'Menú lateral desplegado');
+      showDashboardToast(next ? 'Sidebar collapsed (compact view)' : 'Sidebar expanded');
       return next;
     });
   };
@@ -464,7 +464,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     getChatHistory('dashboard').then(messages => {
       if (active && messages.length) setAiChatMessages(messages);
     }).catch(() => {
-      if (active) setAiError('No se pudo cargar tu historial. Inténtalo más tarde.');
+      if (active) setAiError('Your chat history could not be loaded. Please try again later.');
     }).finally(() => { if (active) setIsHistoryLoading(false); });
     return () => { active = false; };
   }, [user.uid]);
@@ -484,7 +484,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     } catch (error) {
       setAiChatMessages(previous => previous.filter(message => message.id !== userMessage.id));
       setAiInput(userText);
-      setAiError(error instanceof Error ? error.message : 'El asistente no pudo responder. Inténtalo de nuevo.');
+      setAiError(error instanceof Error ? error.message : 'The assistant could not respond. Please try again.');
     } finally {
       setIsAiThinking(false);
       aiSendingRef.current = false;
@@ -2124,7 +2124,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     handleDownloadFormula(
                       'ProLnk_Live_Session_Notes_Daniela_Rios.md',
                       'Classroom Notes',
-                      '# ProLnk Live 1-on-1 Session Notes\nTutor: Daniela Ríos\nStudent: ' + user.name + '\nDate: ' + new Date().toLocaleDateString() + '\n\n## Covered Topics:\n1. Integration by Parts LIATE priority\n2. Tabular method for repeated integrals\n3. Homework review problems 14 to 28.'
+                      '# ProLnk Live 1-on-1 Session Notes\nTutor: Daniela Ríos\nStudent: ' + user.name + '\nDate: ' + new Date().toLocaleDateString('en-US') + '\n\n## Covered Topics:\n1. Integration by Parts LIATE priority\n2. Tabular method for repeated integrals\n3. Homework review problems 14 to 28.'
                     );
                   }}
                   className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold cursor-pointer"

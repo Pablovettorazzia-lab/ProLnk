@@ -76,7 +76,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenTrialModal, onBookExpert, isSu
     } catch (error) {
       setChatMessages(previous => previous.filter(message => message.id !== userMessage.id));
       setInputVal(userText);
-      setChatError(error instanceof Error ? error.message : 'El asistente no pudo responder. Inténtalo de nuevo.');
+      setChatError(error instanceof Error ? error.message : 'The assistant could not respond. Please try again.');
     } finally {
       setIsTyping(false);
       sendingRef.current = false;

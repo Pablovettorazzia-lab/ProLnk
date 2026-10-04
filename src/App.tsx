@@ -86,7 +86,7 @@ export default function App() {
   const loadAccount = async () => {
     const version = ++accountLoadRef.current;
     const profile = await getUserProfile();
-    if (version !== accountLoadRef.current) throw new Error('La sesión ha cambiado. Inténtalo de nuevo.');
+    if (version !== accountLoadRef.current) throw new Error('Your session has changed. Please try again.');
     setCurrentUser(profile);
     setCurrentView('dashboard');
     setUserSessions([]);
@@ -94,7 +94,7 @@ export default function App() {
       const sessions = await getUserSessions();
       if (version === accountLoadRef.current) setUserSessions(sessions);
     } catch {
-      showToast('No se pudo cargar el historial de sesiones.');
+      showToast('Your session history could not be loaded.');
     }
     return profile;
   };
@@ -108,7 +108,7 @@ export default function App() {
     restoreSession().then(async user => {
       if (active && user?.confirmedAt) await loadAccount();
     }).catch(() => {
-      if (active) showToast('No se pudo restaurar tu cuenta. Inicia sesión de nuevo.');
+      if (active) showToast('Your account could not be restored. Please log in again.');
     });
     const unsubscribe = onAuthStatusChange(() => {
       if (!active) return;
@@ -123,7 +123,7 @@ export default function App() {
   const handleRegisterUser = async (_name: string, _email: string, uid?: string) => {
     if (!uid) return;
     const user = await loadAccount();
-    showToast(`Cuenta creada. ¡Bienvenido, ${user.name}!`);
+    showToast(`Account created. Welcome, ${user.name}!`);
   };
 
   const handleLoginUser = async (name: string, email: string, uid?: string) => {
@@ -133,12 +133,12 @@ export default function App() {
       setCurrentUser({ uid: 'demo', name, email, isDemo: true, plan: 'Demo', daysLeft: 3 });
       setUserSessions(USER_PAST_SESSIONS);
       setCurrentView('dashboard');
-      showToast('Modo demo: los cambios no se guardan en una cuenta real.');
+      showToast('Demo mode: changes are not saved to a real account.');
       return;
     }
-    if (!uid) throw new Error('Inicia sesión con tu cuenta.');
+    if (!uid) throw new Error('Please log in with your account.');
     const user = await loadAccount();
-    showToast(`¡Bienvenido de nuevo, ${user.name}!`);
+    showToast(`Welcome back, ${user.name}!`);
   };
 
   const handleLogOut = async () => {
@@ -148,9 +148,9 @@ export default function App() {
       setCurrentUser(null);
       setUserSessions([]);
       setCurrentView('landing');
-      showToast('Sesión cerrada.');
+      showToast('You have logged out.');
     } catch {
-      showToast('No se pudo cerrar la sesión. Inténtalo de nuevo.');
+      showToast('You could not be logged out. Please try again.');
     }
   };
 
@@ -179,7 +179,7 @@ export default function App() {
       if (!currentUser.isDemo && currentUser.uid) await saveUserSession(currentUser.uid, newSession);
       setUserSessions(prev => [newSession, ...prev]);
     } catch {
-      showToast('No se pudo guardar la reserva. Inténtalo de nuevo.');
+      showToast('Your booking could not be saved. Please try again.');
       return;
     }
 
@@ -214,7 +214,7 @@ export default function App() {
       if (!currentUser.isDemo) await createForumPost(newPost, currentUser.uid!);
       setCommunityPosts(prev => [newPost, ...prev]);
     } catch {
-      showToast('No se pudo publicar la pregunta. Inténtalo de nuevo.');
+      showToast('Your question could not be posted. Please try again.');
       return;
     }
 
@@ -231,7 +231,7 @@ export default function App() {
       const result = await updatePostVotes(postId);
       setCommunityPosts(posts => posts.map(post => post.id === postId ? { ...post, ...result } : post));
     } catch {
-      showToast('No se pudo guardar el voto.');
+      showToast('Your vote could not be saved.');
     }
   };
 
@@ -244,12 +244,12 @@ export default function App() {
     if (!currentUser) return;
     if (currentUser.isDemo) {
       setCurrentUser({ ...currentUser, ...updatedData });
-      showToast('Perfil demo actualizado solo durante esta visita.');
+      showToast('Demo profile updated for this visit only.');
       return;
     }
     const profile = await saveUserProfile(updatedData);
     setCurrentUser(profile);
-    showToast('Tu perfil se guardó correctamente.');
+    showToast('Your profile was saved successfully.');
   };
 
   // Dedicated Full-Page Student Profile View (Separate Page with Natural Smooth Scrolling)
@@ -266,7 +266,7 @@ export default function App() {
   }
 
   // If a student is authenticated / has dashboard open, they CANNOT navigate to the landing page
-  // unless they go to their profile section and click "Cerrar Sesión"!
+  // unless they go to their profile section and click "Log Out"!
   if (currentUser) {
     return (
       <>

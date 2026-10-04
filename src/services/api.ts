@@ -6,7 +6,7 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
     signal: options.signal ?? AbortSignal.timeout(55000),
   });
   const data = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(data?.error || 'No se pudo completar la solicitud. Inténtalo de nuevo.');
-  if (data === null) throw new Error('El servicio no está disponible. Inténtalo de nuevo.');
+  if (!response.ok) throw new Error(data?.error || 'The request could not be completed. Please try again.');
+  if (data === null) throw new Error('The service is unavailable. Please try again.');
   return data as T;
 }

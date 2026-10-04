@@ -112,9 +112,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
         sessionReminders,
         aiExplanationStyle,
       });
-      showToast(user.isDemo ? 'Perfil demo actualizado solo durante esta visita.' : 'Perfil guardado correctamente.');
+      showToast(user.isDemo ? 'Demo profile updated for this visit only.' : 'Profile saved successfully.');
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'No se pudo guardar el perfil.');
+      showToast(error instanceof Error ? error.message : 'Your profile could not be saved.');
     } finally {
       setIsSaving(false);
     }

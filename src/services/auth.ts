@@ -3,18 +3,18 @@ import { login, signup, logout, oauthLogin, getUser, getSettings, handleAuthCall
 export { logout as logoutUser };
 
 export function authErrorMessage(error: unknown) {
-  if (error instanceof MissingIdentityError) return 'El servicio de acceso no está disponible en este entorno.';
+  if (error instanceof MissingIdentityError) return 'The login service is unavailable in this environment.';
   if (error instanceof AuthError) {
-    if (error.status === 400 || error.status === 401) return 'Correo o contraseña incorrectos, o correo pendiente de confirmar.';
-    if (error.status === 422) return 'Revisa los datos. Es posible que este correo ya tenga una cuenta.';
-    if (error.status === 429) return 'Demasiados intentos. Espera un momento antes de volver a intentarlo.';
+    if (error.status === 400 || error.status === 401) return 'Incorrect email or password, or your email address has not been confirmed.';
+    if (error.status === 422) return 'Please check your details. This email address may already have an account.';
+    if (error.status === 429) return 'Too many attempts. Please wait a moment before trying again.';
   }
-  return error instanceof Error ? error.message : 'No se pudo completar el acceso.';
+  return error instanceof Error ? error.message : 'You could not be logged in.';
 }
 
 export async function signInWithGoogle() {
   const settings = await getSettings();
-  if (!settings.providers.google) throw new Error('El acceso con Google aún no está habilitado. Usa tu correo y contraseña.');
+  if (!settings.providers.google) throw new Error('Google login is not enabled yet. Please use your email and password.');
   return oauthLogin('google');
 }
 export const loginUserWithEmail = (email: string, password: string) => login(email.trim(), password);

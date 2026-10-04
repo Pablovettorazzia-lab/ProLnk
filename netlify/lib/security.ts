@@ -6,6 +6,6 @@ export function checkOrigin(request: Request) {
     verifyRequestOrigin(request);
     return null;
   } catch {
-    return Response.json({ error: 'Origen de la solicitud no permitido.' }, { status: 403 });
+    return Response.json({ error: 'This request origin is not allowed.' }, { status: 403 });
   }
 }

@@ -16,25 +16,25 @@ export default async (request: Request, context: Context) => {
   try {
     const db = getDatabase();
     if (request.method === 'GET') {
-      if (!user) return Response.json({ error: 'Inicia sesión para ver tu historial.' }, { status: 401 });
+      if (!user) return Response.json({ error: 'Please log in to view your chat history.' }, { status: 401 });
       const surface = new URL(request.url).searchParams.get('surface');
-      if (!['hero', 'dashboard'].includes(surface || '')) return Response.json({ error: 'Chat inválido.' }, { status: 400 });
+      if (!['hero', 'dashboard'].includes(surface || '')) return Response.json({ error: 'Invalid chat.' }, { status: 400 });
       const rows = await db.select().from(chatMessages).where(and(eq(chatMessages.userId, user.id), eq(chatMessages.surface, surface!))).orderBy(desc(chatMessages.createdAt), desc(chatMessages.id)).limit(100);
       return Response.json(rows.reverse().map(row => ({ id: row.id, sender: row.role === 'user' ? 'user' : 'ai', text: row.content })), { headers: { 'Cache-Control': 'no-store' } });
     }
-    if (Number(request.headers.get('content-length') || 0) > 60000) return Response.json({ error: 'El mensaje es demasiado largo.' }, { status: 413 });
+    if (Number(request.headers.get('content-length') || 0) > 60000) return Response.json({ error: 'The message is too long.' }, { status: 413 });
     const body = await request.text();
-    if (body.length > 60000) return Response.json({ error: 'El mensaje es demasiado largo.' }, { status: 413 });
+    if (body.length > 60000) return Response.json({ error: 'The message is too long.' }, { status: 413 });
     let input;
     try { input = JSON.parse(body); }
-    catch { return Response.json({ error: 'Solicitud inválida.' }, { status: 400 }); }
-    if (!input || typeof input.question !== 'string' || !input.question.trim() || input.question.length > 6000 || !['hero', 'dashboard'].includes(input.surface)) return Response.json({ error: 'Escribe una pregunta de hasta 6000 caracteres.' }, { status: 400 });
+    catch { return Response.json({ error: 'Invalid request.' }, { status: 400 }); }
+    if (!input || typeof input.question !== 'string' || !input.question.trim() || input.question.length > 6000 || !['hero', 'dashboard'].includes(input.surface)) return Response.json({ error: 'Please enter a question with no more than 6,000 characters.' }, { status: 400 });
     const bucket = Math.floor(Date.now() / 3600000);
     const actor = user?.id || createHash('sha256').update(context.ip || 'anonymous').digest('hex');
     const rateId = `${user ? 'user' : 'guest'}:${actor}:${bucket}`;
     await db.delete(aiRateLimits).where(lt(aiRateLimits.expiresAt, new Date()));
     const [rate] = await db.insert(aiRateLimits).values({ id: rateId, expiresAt: new Date((bucket + 1) * 3600000) }).onConflictDoUpdate({ target: aiRateLimits.id, set: { count: sql`${aiRateLimits.count} + 1` } }).returning();
-    if (rate.count > (user ? 60 : 10)) return Response.json({ error: 'Alcanzaste el límite de preguntas por hora. Inténtalo más tarde.' }, { status: 429 });
+    if (rate.count > (user ? 60 : 10)) return Response.json({ error: 'You have reached the hourly question limit. Please try again later.' }, { status: 429 });
     let history: { role: 'user' | 'assistant'; content: string }[] = [];
     let preference = 'detailed';
     if (user) {
@@ -50,7 +50,7 @@ export default async (request: Request, context: Context) => {
       model: 'gpt-4.1-mini',
       max_tokens: 1200,
       messages: [
-        { role: 'system', content: `Eres ProLnk, un tutor académico. Responde en el idioma del estudiante, usa el historial para las preguntas de seguimiento y resuelve el problema concreto con pasos y una comprobación. ${preference === 'quick' ? 'Da una explicación breve.' : 'Explica los pasos con claridad y ejemplos cuando ayuden.'} Si faltan datos, pide aclaración. No inventes fuentes, citas, capítulos ni grados de certeza. Incluye una línea Source: únicamente si conoces una referencia real pertinente. No afirmes tener acceso a libros o bases de datos externas.` },
+        { role: 'system', content: `You are ProLnk, an academic tutor. Always respond in English, even when the student writes in another language. Use the conversation history for follow-up questions and solve the specific problem with clear steps and a verification. ${preference === 'quick' ? 'Give a brief explanation.' : 'Explain the steps clearly and include examples when helpful.'} If information is missing, ask for clarification in English. Do not invent sources, citations, chapters, or certainty levels. Include a Source: line only when you know a real, relevant reference. Do not claim access to external books or databases.` },
         ...history,
         { role: 'user', content: input.question.trim() },
       ],
@@ -65,7 +65,7 @@ export default async (request: Request, context: Context) => {
     }
     return Response.json({ reply }, { headers: { 'Cache-Control': 'no-store' } });
   } catch {
-    return Response.json({ error: 'El asistente no pudo responder. Inténtalo de nuevo en unos momentos.' }, { status: 503 });
+    return Response.json({ error: 'The assistant could not respond. Please try again in a few moments.' }, { status: 503 });
   }
 };
 
