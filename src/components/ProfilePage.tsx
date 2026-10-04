@@ -32,7 +32,7 @@ interface ProfilePageProps {
   onBackToDashboard: () => void;
   onViewLandingPage?: () => void;
   onLogOut: () => void;
-  onUpdateProfile?: (updated: Partial<AuthUser>) => void;
+  onUpdateProfile?: (updated: Partial<AuthUser>) => void | Promise<void>;
 }
 
 const PRESET_AVATARS = [
@@ -63,23 +63,23 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 }) => {
   // Form state
   const [profileName, setProfileName] = useState(user.name || '');
-  const [profileBio, setProfileBio] = useState(user.bio || 'University student focused on calculus, physics, and STEM coursework with ProLnk.');
-  const [profileUniversity, setProfileUniversity] = useState(user.university || 'Universidad del Valle de Guatemala');
-  const [profileMajor, setProfileMajor] = useState(user.major || 'Computer Science & Engineering');
-  const [profileSemester, setProfileSemester] = useState(user.semester || '4th Semester');
-  const [profileLearningGoal, setProfileLearningGoal] = useState(user.learningGoal || 'Master integration techniques and maintain a GPA above 90.');
+  const [profileBio, setProfileBio] = useState(user.bio ?? '');
+  const [profileUniversity, setProfileUniversity] = useState(user.university ?? '');
+  const [profileMajor, setProfileMajor] = useState(user.major ?? '');
+  const [profileSemester, setProfileSemester] = useState(user.semester ?? '');
+  const [profileLearningGoal, setProfileLearningGoal] = useState(user.learningGoal ?? '');
   const [profilePhotoURL, setProfilePhotoURL] = useState(user.photoURL || '');
   const [profileSubjects, setProfileSubjects] = useState<string[]>(
     user.targetSubjects && user.targetSubjects.length > 0
       ? user.targetSubjects
-      : ['Multivariable Calculus', 'Physics II', 'Linear Algebra']
+      : []
   );
   const [newSubjectInput, setNewSubjectInput] = useState('');
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [activeTab, setActiveTab] = useState<'info' | 'subjects' | 'achievements' | 'preferences'>('info');
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [sessionReminders, setSessionReminders] = useState(true);
-  const [aiExplanationStyle, setAiExplanationStyle] = useState<'detailed' | 'quick'>('detailed');
+  const [emailNotifications, setEmailNotifications] = useState(user.emailNotifications ?? true);
+  const [sessionReminders, setSessionReminders] = useState(user.sessionReminders ?? true);
+  const [aiExplanationStyle, setAiExplanationStyle] = useState<'detailed' | 'quick'>(user.aiExplanationStyle ?? 'detailed');
   const [isSaving, setIsSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -96,24 +96,28 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
     if (e) e.preventDefault();
     if (!profileName.trim()) return;
 
+    if (isSaving) return;
     setIsSaving(true);
-    if (onUpdateProfile) {
-      await onUpdateProfile({
+    try {
+      await onUpdateProfile?.({
         name: profileName.trim(),
         bio: profileBio.trim(),
         university: profileUniversity.trim(),
         major: profileMajor.trim(),
         semester: profileSemester.trim(),
         learningGoal: profileLearningGoal.trim(),
-        photoURL: profilePhotoURL || undefined,
-        targetSubjects: profileSubjects
+        photoURL: profilePhotoURL || '',
+        targetSubjects: profileSubjects,
+        emailNotifications,
+        sessionReminders,
+        aiExplanationStyle,
       });
-    }
-
-    setTimeout(() => {
+      showToast(user.isDemo ? 'Perfil demo actualizado solo durante esta visita.' : 'Perfil guardado correctamente.');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'No se pudo guardar el perfil.');
+    } finally {
       setIsSaving(false);
-      showToast('Profile saved and synced successfully with Firebase!');
-    }, 400);
+    }
   };
 
   const handleAddSubject = (e?: React.FormEvent) => {
@@ -300,7 +304,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                       <Flame className="w-3.5 h-3.5 text-amber-400" />
                       <span>Study Streak</span>
                     </div>
-                    <div className="text-base font-bold text-white mt-0.5">{user.streakDays || 5} Days</div>
+                    <div className="text-base font-bold text-white mt-0.5">{user.streakDays ?? 0} Days</div>
                   </div>
 
                   <div className="p-2.5 rounded-xl bg-[#080f21] border border-slate-800/80">
@@ -308,7 +312,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                       <Trophy className="w-3.5 h-3.5 text-purple-400" />
                       <span>XP Progress</span>
                     </div>
-                    <div className="text-base font-bold text-white mt-0.5">{user.xpPoints || 840} XP</div>
+                    <div className="text-base font-bold text-white mt-0.5">{user.xpPoints ?? 0} XP</div>
                   </div>
 
                   <div className="p-2.5 rounded-xl bg-[#080f21] border border-slate-800/80">
@@ -504,7 +508,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                       className="px-6 py-2.5 bg-[#F6C62B] hover:bg-[#ffd744] text-slate-950 font-bold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2 cursor-pointer hover:scale-102 disabled:opacity-50"
                     >
                       <Save className="w-4 h-4" />
-                      <span>{isSaving ? 'Saving to Firebase...' : 'Save Information'}</span>
+                      <span>{isSaving ? 'Saving...' : 'Save Information'}</span>
                     </button>
                   </div>
                 </div>
@@ -750,12 +754,11 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
                 <div className="pt-4 border-t border-slate-800/80 flex justify-end">
                   <button
-                    onClick={() => {
-                      showToast('Preferences saved successfully.');
-                    }}
+                    onClick={() => void handleSaveProfile()}
+                    disabled={isSaving}
                     className="px-6 py-2.5 bg-[#F6C62B] hover:bg-[#ffd744] text-slate-950 font-bold text-xs rounded-xl shadow-lg transition-all cursor-pointer hover:scale-102"
                   >
-                    Save Preferences
+                    {isSaving ? 'Saving...' : 'Save Preferences'}
                   </button>
                 </div>
               </div>
