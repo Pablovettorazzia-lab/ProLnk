@@ -309,8 +309,8 @@ export const WhiteboardCanvas: React.FC = () => {
                 type="button"
                 onClick={() => setStrokeColor(c.color)}
                 style={{ backgroundColor: c.color }}
-                className={`w-6 h-6 rounded-full border-2 transition-transform cursor-pointer ${
-                  strokeColor === c.color ? 'scale-125 border-white shadow-md' : 'border-transparent hover:scale-110'
+                className={`w-6 h-6 rounded-full border-2 transition-transform cursor-pointer ring-1 ring-slate-400/50 ${
+                  strokeColor === c.color ? 'scale-125 border-[#F6C62B] shadow-md' : 'border-slate-500/40 hover:scale-110'
                 }`}
                 title={c.label}
               />
@@ -412,7 +412,7 @@ export const WhiteboardCanvas: React.FC = () => {
           className="w-full h-[460px] cursor-crosshair touch-none"
         />
 
-        <div className="absolute bottom-3 left-4 text-[11px] text-slate-400 bg-slate-900/80 px-2.5 py-1 rounded-md border border-slate-800 pointer-events-none">
+        <div className="absolute bottom-3 left-4 text-[11px] bg-[#0F2249]/95 text-slate-200 px-2.5 py-1 rounded-md border border-slate-700 pointer-events-none">
           Draw freely: scratch calculus proofs, physics free-body diagrams, or study notes.
         </div>
       </div>

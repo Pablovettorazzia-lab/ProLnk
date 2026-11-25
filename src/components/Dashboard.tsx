@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ProLnkLogo } from './Logo';
-import { Expert, ForumPost, ForumComment, DashboardSession } from '../types';
+import { Expert, ForumPost, ForumComment, DashboardSession, StudyDocumentPayload, VerifiedSource } from '../types';
 import { EXPERTS_DATA, FORUM_POSTS, USER_PAST_SESSIONS, AI_PRESET_QUESTIONS } from '../data/mockData';
 import { WhiteboardCanvas } from './WhiteboardCanvas';
+import { VerifiedSourcesBar } from './VerifiedSourcesBar';
+import { readStudyFile, formatFileSize, MAX_STUDY_FILES } from '../utils/studyFiles';
 import {
   Home,
   Bot,
@@ -57,7 +59,12 @@ import {
   GraduationCap,
   School,
   Trophy,
-  Check
+  Check,
+  Sun,
+  Moon,
+  Paperclip,
+  Globe,
+  Upload
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -85,6 +92,8 @@ interface DashboardProps {
   onBookExpert: (expert: Expert) => void;
   onUpdateProfile?: (updated: Partial<DashboardProps['user']>) => void;
   onOpenProfile?: () => void;
+  isDarkMode?: boolean;
+  onToggleDarkMode?: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -96,7 +105,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onViewLandingPage,
   onBookExpert,
   onUpdateProfile,
-  onOpenProfile
+  onOpenProfile,
+  isDarkMode,
+  onToggleDarkMode
 }) => {
   const [activeTab, setActiveTab] = useState<'home' | 'ai-chat' | 'tutors' | 'sessions' | 'community' | 'notes' | 'profile' | 'settings'>('home');
   const [notesSubTab, setNotesSubTab] = useState<'canvas' | 'downloads'>('canvas');
@@ -175,7 +186,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
     setProfileSubjects(prev => prev.filter(s => s !== subj));
   };
 
-  // Collapsible sidebar state with local storage persistence
+  // Collapsible sidebar & portal theme state synced with global theme
+  const [localLightTheme, setLocalLightTheme] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('prolnk_theme') !== 'dark';
+    } catch {
+      return true;
+    }
+  });
+  const isLightTheme = isDarkMode !== undefined ? !isDarkMode : localLightTheme;
+  const togglePortalTheme = () => {
+    if (onToggleDarkMode) {
+      onToggleDarkMode();
+      return;
+    }
+    setLocalLightTheme(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('prolnk_theme', next ? 'light' : 'dark');
+      } catch {}
+      return next;
+    });
+  };
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem('prolnk_sidebar_collapsed') === 'true';
@@ -341,22 +373,48 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
-  // Dashboard AI Solver state
+  // Dashboard AI Solver state (with persistent session study library & live grounding)
   const [aiInput, setAiInput] = useState('');
+  const [aiStudyDocs, setAiStudyDocs] = useState<StudyDocumentPayload[]>([]);
+  const [aiGroundingMode, setAiGroundingMode] = useState<'hybrid' | 'document' | 'web'>('hybrid');
+  const aiFileInputRef = useRef<HTMLInputElement>(null);
   const [aiChatMessages, setAiChatMessages] = useState<{
     id: string;
     sender: 'user' | 'ai';
     text: string;
     source?: string;
+    sources?: VerifiedSource[];
+    searchQueries?: string[];
+    webGroundingSkipped?: boolean;
+    attachedFileNames?: string[];
+    isError?: boolean;
   }[]>([
     {
       id: 'd-1',
       sender: 'ai',
-      text: `Hello ${user.name}! I am your ProLnk 24/7 AI tutor. You have unlimited messages enabled with your 3-day trial. What homework problem or exam topic are you working on right now?`,
-      source: 'ProLnk Unified Academic Assistant'
+      text: `Hello ${user.name}! I am your ProLnk 24/7 AI tutor. Every answer can verify facts via live Google Search links or directly read PDFs, notes, and homework photos you upload to your Study Library below.`,
     }
   ]);
   const [isAiThinking, setIsAiThinking] = useState(false);
+
+  const handleUploadStudyFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (files.length === 0) return;
+
+    if (aiStudyDocs.length + files.length > MAX_STUDY_FILES) {
+      showDashboardToast(`Study Library supports up to ${MAX_STUDY_FILES} active files at once.`);
+      return;
+    }
+
+    try {
+      const encoded = await Promise.all(files.map(readStudyFile));
+      setAiStudyDocs(prev => [...prev, ...encoded].slice(0, MAX_STUDY_FILES));
+      showDashboardToast(`Added ${encoded.length} study file${encoded.length > 1 ? 's' : ''} to AI context.`);
+    } catch (err: any) {
+      showDashboardToast(err?.message || 'Could not attach study file.');
+    }
+  };
 
   // Community state inside dashboard
   const [communityPosts, setCommunityPosts] = useState<ForumPost[]>(FORUM_POSTS);
@@ -449,98 +507,88 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const handleSendAiMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!aiInput.trim()) return;
+    if ((!aiInput.trim() && aiStudyDocs.length === 0) || isAiThinking) return;
 
-    const userText = aiInput.trim();
+    const userText =
+      aiInput.trim() || 'Please summarize and explain the key concepts in my uploaded study materials.';
+    const activeDocs = aiGroundingMode === 'web' ? [] : aiStudyDocs;
+    const effectiveMode = activeDocs.length > 0 ? aiGroundingMode : 'web';
     setAiInput('');
 
     setAiChatMessages(prev => [
       ...prev,
-      { id: Date.now() + '-u', sender: 'user', text: userText }
+      {
+        id: Date.now() + '-u',
+        sender: 'user',
+        text: userText,
+        attachedFileNames: activeDocs.map(d => d.name)
+      }
     ]);
 
     setIsAiThinking(true);
 
     try {
-      const res = await fetch('/api/ai/ask', {
+      const historyPayload = aiChatMessages
+        .filter(m => !m.isError)
+        .map(m => ({
+          role: m.sender === 'user' ? 'user' : 'model',
+          text: m.text
+        }));
+
+      const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: userText })
+        body: JSON.stringify({
+          message: userText,
+          history: historyPayload,
+          documents: activeDocs.map(d => ({
+            name: d.name,
+            mimeType: d.mimeType,
+            base64Data: d.base64Data
+          })),
+          groundingMode: effectiveMode,
+          userContext: { isSubscribed: true, studentName: profileName }
+        })
       });
+
       const data = await res.json();
-
-      if (data && data.reply) {
-        const lines = data.reply.split('\n');
-        let sourceLine = 'OpenStax Peer-Reviewed Academic Database';
-        let bodyLines = [];
-
-        for (const line of lines) {
-          if (line.toLowerCase().startsWith('source:')) {
-            sourceLine = line.replace(/source:\s*/i, '').trim();
-          } else {
-            bodyLines.push(line);
-          }
-        }
-
-        setAiChatMessages(prev => [
-          ...prev,
-          {
-            id: Date.now() + '-a',
-            sender: 'ai',
-            text: bodyLines.join('\n').trim() || data.reply,
-            source: sourceLine
-          }
-        ]);
-        setIsAiThinking(false);
-        setTimeout(() => chatLogEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
-        return;
+      if (!res.ok || !data?.reply) {
+        throw new Error(data?.error || 'Could not verify an answer with ProLnk AI.');
       }
-    } catch {
-      // Fallback below
-    }
 
-    setTimeout(() => {
-      const lower = userText.toLowerCase();
-      const isSpanish = /[áéíóúñ¿¡]/.test(lower) || lower.includes('como') || lower.includes('cual') || lower.includes('qué') || lower.includes('derivad') || lower.includes('física') || lower.includes('química') || lower.includes('resolver') || lower.includes('explic');
-
-      let answer = isSpanish
-        ? 'Resolución académica paso a paso:\n1. Identifica los parámetros conocidos y establece las condiciones iniciales.\n2. Aplica el teorema o fórmula correspondiente y simplifica términos algebraicos.\n3. Verifica el resultado y sus unidades.'
-        : 'Step-by-step academic resolution:\n1. Identify known parameters and establish initial conditions.\n2. Apply the fundamental theorem or formula and simplify terms.\n3. Verify validity, dimensions, and boundary units.';
-      let source = 'OpenStax College Science & Math Standards';
-
-      if (lower.includes('derivad') || lower.includes('calcul') || lower.includes('integral') || lower.includes('derivative')) {
-        if (isSpanish) {
-          answer = 'Solución de cálculo paso a paso:\n1. Aplica la regla diferencial adecuada (regla de la cadena d/dx[f(g(x))] = f\'(g(x))·g\'(x) o integración por partes).\n2. Factoriza los términos diferenciales comunes.\n3. Despeja dy/dx y verifica con las propiedades algebraicas.';
-          source = 'Stewart Cálculo: Trascendentes Tempranas (8va Ed), Capítulo 3';
-        } else {
-          answer = 'Calculus problem breakdown:\n1. Apply implicit differentiation or the chain rule d/dx [f(g(x))] = f\'(g(x)) · g\'(x).\n2. Factor out the common derivative terms.\n3. Solve for dy/dx and test against known polynomial properties.';
-          source = 'Stewart Calculus (8th Ed), Chapter 3';
-        }
-      } else if (lower.includes('físic') || lower.includes('fuerza') || lower.includes('energ') || lower.includes('physics') || lower.includes('force')) {
-        if (isSpanish) {
-          answer = 'Desglose de física paso a paso:\n1. Dibuja el diagrama de cuerpo libre (DCL) y define la convención de signos.\n2. Aplica la conservación de energía mecánica E_inicial = E_final o ΣF = m·a.\n3. Calcula el trabajo de rozamiento W_f = μ·N·d si corresponde.';
-          source = 'Giancoli Física: Principios con Aplicaciones (7ma Ed), Capítulo 4';
-        } else {
-          answer = 'Physics solution breakdown:\n1. Draw coordinate axes and set upward/rightward as positive.\n2. Apply conservation of mechanical energy: E_initial = E_final.\n3. Account for friction loss W_f = f_k · d if applicable.';
-          source = 'Giancoli Physics: Principles with Applications (7th Ed)';
-        }
-      } else if (lower.includes('químic') || lower.includes('chemistry') || lower.includes('reaccion') || lower.includes('molecul')) {
-        if (isSpanish) {
-          answer = 'Solución de química paso a paso:\n1. Balancea la ecuación estequiométrica asegurando conservación de masa.\n2. Convierte las masas a moles (n = m/M) y encuentra el reactivo limitante.\n3. Calcula el rendimiento teórico del producto.';
-          source = 'Chang Química General (12va Ed), Capítulo 3';
-        } else {
-          answer = 'Chemistry solution breakdown:\n1. Balance the chemical reaction to conserve moles.\n2. Convert mass to moles (n = m/M) and identify the limiting reactant.\n3. Compute theoretical yield and apply ideal gas law (PV = nRT) if applicable.';
-          source = 'Chang General Chemistry (12th Ed), Chapter 3';
-        }
-      }
+      const cleanReply = data.reply
+        .split('\n')
+        .filter((line: string) => !line.toLowerCase().startsWith('source:'))
+        .join('\n')
+        .trim();
 
       setAiChatMessages(prev => [
         ...prev,
-        { id: Date.now() + '-a', sender: 'ai', text: answer, source }
+        {
+          id: Date.now() + '-a',
+          sender: 'ai',
+          text: cleanReply || data.reply,
+          sources: Array.isArray(data.sources) ? data.sources : [],
+          searchQueries: Array.isArray(data.searchQueries) ? data.searchQueries : [],
+          webGroundingSkipped: Boolean(data.webGroundingSkipped)
+        }
       ]);
+    } catch (err: any) {
+      setAiChatMessages(prev => [
+        ...prev,
+        {
+          id: Date.now() + '-err',
+          sender: 'ai',
+          text:
+            err?.message ||
+            'Unable to reach ProLnk AI right now. Please try again or book a 1-on-1 tutor.',
+          isError: true
+        }
+      ]);
+    } finally {
       setIsAiThinking(false);
       setTimeout(() => chatLogEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
-    }, 100);
+    }
   };
 
   const handleVote = (id: string) => {
@@ -553,7 +601,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   };
 
   return (
-    <div className="h-screen max-h-screen overflow-hidden bg-[#070d1c] text-slate-100 flex flex-col md:flex-row antialiased relative">
+    <>
+      <div className={`${isLightTheme ? 'portal-light bg-[#FAFAF7] text-slate-900' : 'bg-[#070d1c] text-slate-100'} h-screen max-h-screen overflow-hidden flex flex-col md:flex-row antialiased relative`}>
       
       {/* Mobile Drawer Backdrop */}
       {mobileSidebarOpen && (
@@ -567,7 +616,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           >
             <div>
               <div className="p-3 border-b border-slate-800 flex items-center justify-between">
-                <ProLnkLogo size="sm" light={true} />
+                <ProLnkLogo size="sm" light={!isLightTheme} />
                 <button
                   onClick={() => setMobileSidebarOpen(false)}
                   className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
@@ -665,14 +714,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className={`p-4 border-b border-slate-800 flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
             {!sidebarCollapsed ? (
               <div className="flex items-center gap-2">
-                <ProLnkLogo size="sm" light={true} showWordmark={true} />
-                <span className="text-[10px] font-bold bg-[#F6C62B]/20 text-[#F6C62B] px-2 py-0.5 rounded-full uppercase tracking-wider">
+                <ProLnkLogo size="sm" light={!isLightTheme} showWordmark={true} />
+                <span className="text-[10px] font-bold bg-[#F6C62B]/20 text-amber-600 px-2 py-0.5 rounded-full uppercase tracking-wider">
                   Portal
                 </span>
               </div>
             ) : (
               <div className="p-1.5 rounded-xl bg-[#080f21] border border-slate-800 flex items-center justify-center shadow-sm">
-                <ProLnkLogo size="sm" light={true} showWordmark={false} />
+                <ProLnkLogo size="sm" light={!isLightTheme} showWordmark={false} />
               </div>
             )}
           </div>
@@ -752,7 +801,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </div>
                 )}
                 <div className="overflow-hidden flex-1">
-                  <div className="text-xs font-bold text-white truncate group-hover:text-[#F6C62B] transition-colors">{profileName}</div>
+                  <div className={`text-xs font-bold text-white truncate transition-colors ${isLightTheme ? 'group-hover:text-[#0F2249]' : 'group-hover:text-[#F6C62B]'}`}>{profileName}</div>
                   <div className="text-[10px] text-emerald-400 font-medium">My Student Profile →</div>
                 </div>
               </div>
@@ -826,6 +875,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           <div className="flex items-center gap-2.5">
             <button
+              type="button"
+              onClick={togglePortalTheme}
+              className={`p-2 rounded-full border transition-colors cursor-pointer shrink-0 ${
+                isLightTheme
+                  ? 'border-slate-300 bg-white hover:bg-slate-100 text-[#0F2249]'
+                  : 'border-slate-700/80 bg-[#122144] hover:bg-[#192f5e] text-slate-300 hover:text-white'
+              }`}
+              title={isLightTheme ? 'Switch to Dark Mode' : 'Switch to Light Studio'}
+              aria-label={isLightTheme ? 'Switch to Dark Mode' : 'Switch to Light Studio'}
+            >
+              {isLightTheme ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5 text-[#F6C62B]" />}
+            </button>
+            <button
               onClick={() => setActiveTab('ai-chat')}
               className="px-3.5 py-1.5 rounded-full bg-[#F6C62B] text-slate-950 font-bold text-xs hover:bg-[#ffd744] transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm shrink-0"
             >
@@ -837,7 +899,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
               onClick={() => {
                 if (onOpenProfile) onOpenProfile();
               }}
-              className="flex items-center gap-2 p-1 pl-2 pr-3 rounded-full border border-slate-700/80 bg-[#122144] hover:bg-[#192f5e] text-slate-200 transition-all cursor-pointer shadow-sm hover:scale-102"
+              className={`flex items-center gap-2 p-1 pl-2 pr-3 rounded-full border transition-all cursor-pointer shadow-sm hover:scale-102 ${
+                isLightTheme
+                  ? 'border-slate-300 bg-white hover:bg-slate-100 text-slate-900'
+                  : 'border-slate-700/80 bg-[#122144] hover:bg-[#192f5e] text-slate-200'
+              }`}
               title="My Student Profile"
             >
               {profilePhotoURL ? (
@@ -857,7 +923,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="p-6 lg:p-8 space-y-8 max-w-7xl mx-auto w-full">
             
             {/* Hero Welcome banner */}
-            <div className="bg-gradient-to-r from-[#0F2249] via-[#142958] to-[#0d1c3d] border border-[#F6C62B]/30 rounded-2xl p-6 sm:p-8 relative overflow-hidden shadow-xl">
+            <div className="portal-hero-banner bg-gradient-to-r from-[#0F2249] via-[#142958] to-[#0d1c3d] border border-[#F6C62B]/30 rounded-2xl p-6 sm:p-8 relative overflow-hidden shadow-xl">
               <div className="flex flex-wrap items-center gap-2 mb-3">
                 <span className="px-2.5 py-0.5 rounded-full bg-[#F6C62B] text-slate-950 text-[10px] font-extrabold uppercase tracking-wide">
                   ProLnk Active
@@ -1000,7 +1066,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             {/* NEW: Upcoming Live Tutoring Spotlight Card */}
-            <div className="bg-gradient-to-r from-[#0F2249] to-[#0c1a38] border-2 border-[#F6C62B]/60 rounded-2xl p-6 sm:p-7 relative overflow-hidden shadow-2xl">
+            <div className="portal-hero-banner bg-gradient-to-r from-[#0F2249] to-[#0c1a38] border-2 border-[#F6C62B]/60 rounded-2xl p-6 sm:p-7 relative overflow-hidden shadow-2xl">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                 
                 <div className="flex items-start gap-4">
@@ -1320,7 +1386,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                     {challengeRevealed && (
                       <div className="mt-3 p-3.5 rounded-xl bg-[#080f21] border border-slate-800 text-xs text-slate-300 space-y-2 animate-in fade-in">
-                        <div className="font-bold text-white text-[11px] uppercase tracking-wide text-emerald-400">
+                        <div className="font-bold text-[11px] uppercase tracking-wide text-emerald-400">
                           Step-by-Step Derivation:
                         </div>
                         <p>1. <strong>Choose u and dv:</strong> By LIATE, set algebraic <span className="text-amber-300">u = x</span> and trigonometric <span className="text-amber-300">dv = cos(x) dx</span>.</p>
@@ -1472,26 +1538,119 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         )}
 
-        {/* Tab 2: Full-screen AI Homework Solver */}
+        {/* Tab 2: Full-screen AI Homework Solver with Real Web & Document Grounding */}
         {activeTab === 'ai-chat' && (
-          <div className="flex-1 flex flex-col p-6 max-w-4xl mx-auto w-full h-[calc(100vh-4rem)]">
+          <div className="flex-1 flex flex-col p-4 sm:p-6 max-w-4xl mx-auto w-full h-[calc(100vh-4rem)]">
             <div className="bg-[#0c162e] border border-slate-700/80 rounded-2xl flex-1 flex flex-col overflow-hidden shadow-2xl">
               
-              {/* Header */}
-              <div className="px-5 py-3.5 bg-[#080f21] border-b border-slate-800 flex items-center justify-between">
+              {/* Header + Grounding Mode Selector */}
+              <div className="px-5 py-3.5 bg-[#080f21] border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-lg bg-[#0F2249] text-[#F6C62B] flex items-center justify-center">
                     <Sparkles className="w-4 h-4" />
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-white font-display">ProLnk AI Tutor</h3>
-                    <div className="text-[11px] text-slate-400">Unlimited questions enabled (Trial active)</div>
+                    <div className="text-[11px] text-slate-400">
+                      Live web search links + uploaded PDF/notes verification
+                    </div>
                   </div>
                 </div>
-                <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span>Online 24/7</span>
-                </span>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="inline-flex items-center rounded-lg bg-[#122144] border border-slate-700/80 p-0.5 text-[11px]">
+                    {(
+                      [
+                        { id: 'hybrid', label: 'Web + Docs' },
+                        { id: 'document', label: 'Docs Only' },
+                        { id: 'web', label: 'Live Web' }
+                      ] as const
+                    ).map(mode => {
+                      const disabled = mode.id === 'document' && aiStudyDocs.length === 0;
+                      const active = aiGroundingMode === mode.id;
+                      return (
+                        <button
+                          key={mode.id}
+                          type="button"
+                          disabled={disabled}
+                          onClick={() => setAiGroundingMode(mode.id)}
+                          className={`px-2.5 py-1 rounded-md font-semibold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                            active
+                              ? 'bg-[#F6C62B] text-slate-950 font-bold'
+                              : 'text-slate-300 hover:text-white'
+                          }`}
+                          title={
+                            disabled
+                              ? 'Upload a PDF or study notes first to use Docs Only mode'
+                              : `Use ${mode.label} grounding`
+                          }
+                        >
+                          {mode.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Grounded</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Study Library Drawer (Uploaded PDFs / Notes / Homework Photos) */}
+              <div className="px-5 py-2.5 bg-[#080f21]/60 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <input
+                    ref={aiFileInputRef}
+                    type="file"
+                    accept=".pdf,.txt,.md,.csv,.png,.jpg,.jpeg,.webp"
+                    multiple
+                    onChange={handleUploadStudyFiles}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => aiFileInputRef.current?.click()}
+                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-[11px] flex items-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-[#F6C62B]" />
+                    <span>Upload PDF / Notes</span>
+                  </button>
+
+                  {aiStudyDocs.length === 0 ? (
+                    <span className="text-[11px] text-slate-400">
+                      Attach textbook chapters, PDFs, or homework photos (up to 3 files, 8 MB each)
+                    </span>
+                  ) : (
+                    aiStudyDocs.map(doc => (
+                      <span
+                        key={doc.id}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[11px] font-medium"
+                      >
+                        <FileText className="w-3 h-3 shrink-0" />
+                        <span className="truncate max-w-[160px]">{doc.name}</span>
+                        <span className="text-[10px] opacity-75">({formatFileSize(doc.sizeBytes)})</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAiStudyDocs(prev => {
+                              const next = prev.filter(d => d.id !== doc.id);
+                              if (next.length === 0 && aiGroundingMode === 'document') {
+                                setAiGroundingMode('hybrid');
+                              }
+                              return next;
+                            });
+                          }}
+                          className="hover:text-rose-300 cursor-pointer"
+                          title={`Remove ${doc.name}`}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))
+                  )}
+                </div>
               </div>
 
               {/* Chat Log */}
@@ -1505,15 +1664,35 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       className={`max-w-[85%] rounded-2xl px-4 py-3 ${
                         msg.sender === 'user'
                           ? 'bg-[#1b2f60] text-white border border-[#2b4486]'
+                          : msg.isError
+                          ? 'bg-rose-500/10 text-rose-300 border border-rose-500/40'
                           : 'bg-[#122144] text-slate-200 border border-slate-700/70 shadow-sm'
                       }`}
                     >
-                      <div className="whitespace-pre-line leading-relaxed">{msg.text}</div>
-                      {msg.source && (
-                        <div className="mt-2.5 pt-2 border-t border-slate-700/60 text-[11px] text-[#F6C62B]">
-                          <span className="font-semibold text-slate-400">Source: </span>
-                          <span className="text-slate-200 italic">{msg.source}</span>
+                      {msg.attachedFileNames && msg.attachedFileNames.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                          {msg.attachedFileNames.map(name => (
+                            <span
+                              key={name}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/10 text-[10px] font-medium"
+                            >
+                              <FileText className="w-3 h-3" />
+                              <span className="truncate max-w-[180px]">{name}</span>
+                            </span>
+                          ))}
                         </div>
+                      )}
+
+                      <div className="whitespace-pre-line leading-relaxed">{msg.text}</div>
+
+                      {!msg.isError && (
+                        <VerifiedSourcesBar
+                          sources={msg.sources}
+                          fallbackText={msg.source}
+                          searchQueries={msg.searchQueries}
+                          webGroundingSkipped={msg.webGroundingSkipped}
+                          variant={isLightTheme ? 'light' : 'dark'}
+                        />
                       )}
                     </div>
                   </div>
@@ -1524,7 +1703,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <span className="w-1.5 h-1.5 rounded-full bg-[#F6C62B] animate-bounce"></span>
                     <span className="w-1.5 h-1.5 rounded-full bg-[#F6C62B] animate-bounce [animation-delay:0.2s]"></span>
                     <span className="w-1.5 h-1.5 rounded-full bg-[#F6C62B] animate-bounce [animation-delay:0.4s]"></span>
-                    <span className="text-[11px] ml-1">Solving with academic sources...</span>
+                    <span className="text-[11px] ml-1">Verifying web &amp; document sources...</span>
                   </div>
                 )}
                 <div ref={chatLogEndRef} />
@@ -1532,7 +1711,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
               {/* Quick Preset Prompts */}
               <div className="px-4 py-2 bg-[#080f21] border-t border-slate-800 flex items-center gap-2 overflow-x-auto text-xs">
-                <span className="text-slate-400 shrink-0 text-[11px]">Quick question:</span>
+                <span className="text-slate-400 shrink-0 text-[11px]">Verified examples:</span>
                 {AI_PRESET_QUESTIONS.map(p => (
                   <button
                     key={p.topic}
@@ -1540,7 +1719,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       setAiChatMessages(prev => [
                         ...prev,
                         { id: Date.now() + '-u', sender: 'user', text: p.question },
-                        { id: Date.now() + '-a', sender: 'ai', text: p.answer, source: p.source }
+                        {
+                          id: Date.now() + '-a',
+                          sender: 'ai',
+                          text: p.answer,
+                          source: p.source,
+                          sources: p.sources
+                        }
                       ]);
                     }}
                     className="px-2.5 py-1 rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs whitespace-nowrap cursor-pointer transition-colors"
@@ -1552,16 +1737,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
               {/* Input Form */}
               <form onSubmit={handleSendAiMessage} className="p-3.5 bg-[#080f21] border-t border-slate-800 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => aiFileInputRef.current?.click()}
+                  className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors cursor-pointer shrink-0"
+                  title="Upload study PDF, notes, or image"
+                >
+                  <Paperclip className="w-4 h-4" />
+                </button>
                 <input
                   type="text"
                   value={aiInput}
                   onChange={e => setAiInput(e.target.value)}
-                  placeholder="Type any homework problem, equation, or concept..."
+                  placeholder={
+                    aiStudyDocs.length > 0
+                      ? `Ask about ${aiStudyDocs[0].name} or any homework topic...`
+                      : 'Type any homework problem, equation, or concept...'
+                  }
                   className="flex-1 bg-[#122144] border border-slate-700 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#F6C62B]"
                 />
                 <button
                   type="submit"
-                  disabled={!aiInput.trim() || isAiThinking}
+                  disabled={(!aiInput.trim() && aiStudyDocs.length === 0) || isAiThinking}
                   className="px-5 py-2.5 bg-[#F6C62B] hover:bg-[#ffd744] disabled:opacity-50 text-slate-950 font-bold text-xs rounded-xl cursor-pointer flex items-center gap-1.5"
                 >
                   <span>Solve</span>
@@ -2147,8 +2344,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
         )}
 
       </main>
+      </div>
 
-      {/* Interactive Virtual Live Classroom Modal */}
+      {/* Interactive Virtual Live Classroom Modal (Always dark studio outside .portal-light) */}
       {classroomOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
           <div className="bg-[#0a1329] border-2 border-[#F6C62B]/80 rounded-2xl w-full max-w-5xl h-[88vh] max-h-[780px] flex flex-col overflow-hidden shadow-2xl relative">
@@ -2417,7 +2615,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <span>{dashboardToast}</span>
         </div>
       )}
-
-    </div>
+    </>
   );
 };

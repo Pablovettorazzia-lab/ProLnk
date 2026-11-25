@@ -2,9 +2,18 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Default deny catch-all
+    // Global Safety Net (Default Deny)
     match /{document=**} {
       allow read, write: if false;
+    }
+
+    // Core Primitives
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
     }
 
     function isSignedIn() {
@@ -19,53 +28,234 @@ service cloud.firestore {
       return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
-    // Connection test collection
-    match /test/{docId} {
-      allow read, write: if true;
+    function isOptionalString(data, key, maxLen) {
+      return !(key in data) || (data[key] is string && data[key].size() <= maxLen);
     }
 
-    // User profiles & private subcollections
+    function isOptionalNumber(data, key, minVal, maxVal) {
+      return !(key in data) || (data[key] is number && data[key] >= minVal && data[key] <= maxVal);
+    }
+
+    // Entity Validation Blueprints
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['id', 'name', 'email', 'plan', 'role', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly([
+          'id', 'name', 'email', 'photoURL', 'plan', 'role',
+          'bio', 'university', 'major', 'semester', 'targetSubjects',
+          'learningGoal', 'streakDays', 'xpPoints', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 100
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 200
+        && data.plan is string && data.plan.size() >= 1 && data.plan.size() <= 60
+        && data.role is string && data.role in ['student', 'tutor', 'admin']
+        && isOptionalString(data, 'photoURL', 500)
+        && isOptionalString(data, 'bio', 500)
+        && isOptionalString(data, 'university', 150)
+        && isOptionalString(data, 'major', 150)
+        && isOptionalString(data, 'semester', 60)
+        && isOptionalString(data, 'learningGoal', 500)
+        && isOptionalNumber(data, 'streakDays', 0, 100000)
+        && isOptionalNumber(data, 'xpPoints', 0, 10000000)
+        && (!('targetSubjects' in data) || (
+          data.targetSubjects is list
+          && data.targetSubjects.size() <= 20
+          && (data.targetSubjects.size() == 0 || (data.targetSubjects[0] is string && data.targetSubjects[0].size() <= 80))
+        ))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUserSession(data) {
+      return data.keys().hasAll(['id', 'userId', 'expertName', 'subject', 'topic', 'date', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly([
+          'id', 'userId', 'expertId', 'expertName', 'subject', 'topic',
+          'date', 'day', 'month', 'time', 'total', 'status',
+          'tutorNotes', 'urgentUsed', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && isValidId(data.userId)
+        && isOptionalString(data, 'expertId', 128)
+        && data.expertName is string && data.expertName.size() >= 1 && data.expertName.size() <= 100
+        && data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 100
+        && data.topic is string && data.topic.size() >= 1 && data.topic.size() <= 200
+        && data.date is string && data.date.size() >= 1 && data.date.size() <= 80
+        && isOptionalString(data, 'day', 20)
+        && isOptionalString(data, 'month', 20)
+        && isOptionalString(data, 'time', 40)
+        && isOptionalNumber(data, 'total', 0, 100000)
+        && data.status is string && data.status in ['upcoming', 'confirmed', 'completed', 'cancelled']
+        && isOptionalString(data, 'tutorNotes', 1000)
+        && (!('urgentUsed' in data) || data.urgentUsed is bool)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUserSketch(data) {
+      return data.keys().hasAll(['id', 'userId', 'title', 'dataUrl', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'userId', 'title', 'dataUrl', 'timestamp', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && isValidId(data.userId)
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 150
+        && data.dataUrl is string && data.dataUrl.size() >= 1 && data.dataUrl.size() <= 500000
+        && isOptionalString(data, 'timestamp', 60)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidForumPost(data) {
+      return data.keys().hasAll([
+          'id', 'title', 'previewText', 'category', 'author',
+          'authorId', 'votes', 'repliesCount', 'hasExpertAnswer', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'title', 'previewText', 'category', 'author', 'authorId',
+          'votes', 'repliesCount', 'hasExpertAnswer', 'expertName',
+          'expertAnswer', 'timeAgo', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 300
+        && data.previewText is string && data.previewText.size() >= 1 && data.previewText.size() <= 2000
+        && data.category is string && data.category.size() >= 1 && data.category.size() <= 60
+        && data.author is string && data.author.size() >= 1 && data.author.size() <= 100
+        && isValidId(data.authorId)
+        && data.votes is int && data.votes >= 0 && data.votes <= 1000000
+        && data.repliesCount is int && data.repliesCount >= 0 && data.repliesCount <= 100000
+        && data.hasExpertAnswer is bool
+        && isOptionalString(data, 'expertName', 100)
+        && isOptionalString(data, 'expertAnswer', 3000)
+        && isOptionalString(data, 'timeAgo', 40)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // Connection check document (read-only single doc get, writes strictly denied)
+    match /test/{docId} {
+      allow get: if isValidId(docId) && docId == 'connection';
+      allow list, write: if false;
+    }
+
+    // User profiles & private subcollections (PII isolated to owner only)
     match /users/{userId} {
-      allow get: if isOwner(userId);
+      allow get: if isOwner(userId) && isValidId(userId);
       allow list: if false;
       allow create: if isOwner(userId)
-        && request.resource.data.id == userId
-        && request.resource.data.email is string
-        && request.resource.data.name is string;
+        && isValidId(userId)
+        && isValidUserProfile(incoming())
+        && incoming().id == userId
+        && incoming().role == 'student'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
       allow update: if isOwner(userId)
-        && request.resource.data.id == userId;
-      allow delete: if isOwner(userId);
+        && isValidId(userId)
+        && isValidUserProfile(incoming())
+        && incoming().id == existing().id
+        && incoming().role == existing().role
+        && incoming().email == existing().email
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'name', 'photoURL', 'plan', 'bio', 'university', 'major',
+          'semester', 'targetSubjects', 'learningGoal', 'streakDays',
+          'xpPoints', 'updatedAt'
+        ]);
+      allow delete: if isOwner(userId) && isValidId(userId);
 
-      // User private sessions
+      // Private tutoring sessions (Master Gate enforces existing parent user profile)
       match /sessions/{sessionId} {
-        allow read: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(sessionId);
+        allow list: if isOwner(userId) && existing().userId == request.auth.uid;
         allow create: if isOwner(userId)
-          && request.resource.data.userId == userId;
+          && isValidId(userId)
+          && isValidId(sessionId)
+          && isValidUserSession(incoming())
+          && incoming().id == sessionId
+          && incoming().userId == userId
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/users/$(userId));
         allow update: if isOwner(userId)
-          && request.resource.data.userId == userId;
-        allow delete: if isOwner(userId);
+          && isValidId(userId)
+          && isValidId(sessionId)
+          && isValidUserSession(incoming())
+          && !(existing().status in ['completed', 'cancelled'])
+          && incoming().id == existing().id
+          && incoming().userId == existing().userId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'topic', 'date', 'day', 'month', 'time', 'status',
+            'tutorNotes', 'urgentUsed', 'updatedAt'
+          ]);
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(sessionId);
       }
 
-      // User private sketches / notes
+      // Private whiteboard sketches (Master Gate enforces existing parent user profile)
       match /sketches/{sketchId} {
-        allow read: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(sketchId);
+        allow list: if isOwner(userId) && existing().userId == request.auth.uid;
         allow create: if isOwner(userId)
-          && request.resource.data.userId == userId;
+          && isValidId(userId)
+          && isValidId(sketchId)
+          && isValidUserSketch(incoming())
+          && incoming().id == sketchId
+          && incoming().userId == userId
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/users/$(userId));
         allow update: if isOwner(userId)
-          && request.resource.data.userId == userId;
-        allow delete: if isOwner(userId);
+          && isValidId(userId)
+          && isValidId(sketchId)
+          && isValidUserSketch(incoming())
+          && incoming().id == existing().id
+          && incoming().userId == existing().userId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'title', 'dataUrl', 'timestamp', 'updatedAt'
+          ]);
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(sketchId);
       }
     }
 
-    // Public community forum posts
+    // Public community forum posts with strict author and upvote validation
     match /forum_posts/{postId} {
-      allow read: if true;
+      allow get: if isValidId(postId);
+      allow list: if existing().createdAt > timestamp.date(1970, 1, 1)
+        && request.query.limit <= 100;
       allow create: if isSignedIn()
-        && request.resource.data.authorId == request.auth.uid
-        && request.resource.data.title is string
-        && request.resource.data.title.size() <= 300;
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn() && resource.data.authorId == request.auth.uid;
+        && isValidId(postId)
+        && isValidForumPost(incoming())
+        && incoming().id == postId
+        && incoming().authorId == request.auth.uid
+        && incoming().votes == 1
+        && incoming().repliesCount == 0
+        && incoming().hasExpertAnswer == false
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isSignedIn()
+        && isValidId(postId)
+        && isValidForumPost(incoming())
+        && incoming().id == existing().id
+        && incoming().authorId == existing().authorId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action 1: Author edits post content
+          (
+            existing().authorId == request.auth.uid
+            && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'previewText', 'category', 'updatedAt'])
+          )
+          ||
+          // Action 2: Authenticated community upvote/unvote (+/- 1)
+          (
+            incoming().diff(existing()).affectedKeys().hasOnly(['votes', 'updatedAt'])
+            && (incoming().votes == existing().votes + 1 || incoming().votes == existing().votes - 1)
+          )
+        );
+      allow delete: if isSignedIn()
+        && isValidId(postId)
+        && existing().authorId == request.auth.uid;
     }
   }
 }

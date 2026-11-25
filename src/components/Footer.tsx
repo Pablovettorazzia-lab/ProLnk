@@ -1,99 +1,108 @@
 import React from 'react';
 import { ProLnkLogo } from './Logo';
+import { PublicPage } from '../types';
 
 interface FooterProps {
   onOpenTrialModal: () => void;
   onOpenContactModal: () => void;
+  isDarkMode?: boolean;
+  onNavigate?: (page: PublicPage, sectionId?: string) => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ onOpenTrialModal, onOpenContactModal }) => {
+export const Footer: React.FC<FooterProps> = ({
+  onOpenTrialModal,
+  onOpenContactModal,
+  isDarkMode = false,
+  onNavigate
+}) => {
+  const go = (page: PublicPage, sectionId?: string) => {
+    if (onNavigate) {
+      onNavigate(page, sectionId);
+    }
+  };
+
   return (
-    <footer className="bg-[#050a16] border-t border-slate-800 text-slate-400 text-xs sm:text-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
+    <footer className="bg-[#F3F1EC] border-t border-slate-200 text-slate-600 text-xs">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
         
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-10 pb-12 border-b border-slate-800/80">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-10 pb-12 border-b border-slate-200/90">
           
-          {/* Brand info */}
           <div className="md:col-span-2 space-y-4">
-            <a href="#top" className="inline-block" aria-label="ProLnk Home">
-              <ProLnkLogo size="md" />
-            </a>
-            <p className="text-xs text-slate-400 max-w-sm leading-relaxed">
-              Smart. Expert. Fast. Help from AI and real people, whenever you need it.
+            <button
+              type="button"
+              onClick={() => go('home')}
+              className="inline-block cursor-pointer text-left"
+              aria-label="ProLnk Home"
+            >
+              <ProLnkLogo size="md" light={isDarkMode} />
+            </button>
+            <p className="text-xs text-slate-700 max-w-xs leading-relaxed">
+              Source-cited AI tutoring paired with verified live educators whenever you need help.
             </p>
           </div>
 
-          {/* Product Column */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider font-display">Product</h4>
-            <ul className="space-y-2 text-xs">
+            <h4 className="text-xs font-bold text-slate-950 uppercase tracking-wider">Product</h4>
+            <ul className="space-y-2 text-slate-700">
               <li>
-                <a href="#speeds" className="hover:text-[#F6C62B] transition-colors">
+                <button type="button" onClick={() => go('home', 'speeds')} className="hover:text-[#0F2249] transition-colors cursor-pointer">
                   Get help
-                </a>
+                </button>
               </li>
               <li>
-                <a href="#how" className="hover:text-[#F6C62B] transition-colors">
+                <button type="button" onClick={() => go('how')} className="hover:text-[#0F2249] transition-colors cursor-pointer">
                   How it works
-                </a>
+                </button>
               </li>
               <li>
-                <a href="#pricing" className="hover:text-[#F6C62B] transition-colors">
+                <button type="button" onClick={() => go('pricing')} className="hover:text-[#0F2249] transition-colors cursor-pointer">
                   Pricing
-                </a>
+                </button>
               </li>
             </ul>
           </div>
 
-          {/* Learn Column */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider font-display">Learn</h4>
-            <ul className="space-y-2 text-xs">
+            <h4 className="text-xs font-bold text-slate-950 uppercase tracking-wider">Learn</h4>
+            <ul className="space-y-2 text-slate-700">
               <li>
-                <a href="#experts" className="hover:text-[#F6C62B] transition-colors">
+                <button type="button" onClick={() => go('experts')} className="hover:text-[#0F2249] transition-colors cursor-pointer">
                   Experts
-                </a>
+                </button>
               </li>
               <li>
-                <a href="#community" className="hover:text-[#F6C62B] transition-colors">
+                <button type="button" onClick={() => go('community')} className="hover:text-[#0F2249] transition-colors cursor-pointer">
                   Community
-                </a>
+                </button>
               </li>
               <li>
-                <a href="#faq" className="hover:text-[#F6C62B] transition-colors">
+                <button type="button" onClick={() => go('how', 'faq')} className="hover:text-[#0F2249] transition-colors cursor-pointer">
                   FAQ
-                </a>
+                </button>
               </li>
             </ul>
           </div>
 
-          {/* Company Column */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider font-display">Company</h4>
-            <ul className="space-y-2 text-xs">
+            <h4 className="text-xs font-bold text-slate-950 uppercase tracking-wider">Company</h4>
+            <ul className="space-y-2 text-slate-700">
               <li>
-                <a href="#about" className="hover:text-[#F6C62B] transition-colors">
+                <button type="button" onClick={() => go('about')} className="hover:text-[#0F2249] transition-colors cursor-pointer">
                   About
-                </a>
+                </button>
               </li>
               <li>
-                <button
-                  onClick={onOpenContactModal}
-                  className="hover:text-[#F6C62B] transition-colors text-left cursor-pointer"
-                >
+                <button type="button" onClick={onOpenContactModal} className="hover:text-[#0F2249] transition-colors text-left cursor-pointer">
                   Contact
                 </button>
               </li>
               <li>
-                <a href="#team" className="hover:text-[#F6C62B] transition-colors">
+                <button type="button" onClick={() => go('about', 'team')} className="hover:text-[#0F2249] transition-colors cursor-pointer">
                   Team
-                </a>
+                </button>
               </li>
               <li>
-                <button
-                  onClick={onOpenTrialModal}
-                  className="hover:text-[#F6C62B] transition-colors text-left cursor-pointer"
-                >
+                <button type="button" onClick={onOpenTrialModal} className="hover:text-[#0F2249] transition-colors text-left cursor-pointer">
                   Start free trial
                 </button>
               </li>
@@ -102,18 +111,18 @@ export const Footer: React.FC<FooterProps> = ({ onOpenTrialModal, onOpenContactM
 
         </div>
 
-        {/* Bottom Bar matching original text */}
-        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-4">
+        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-600 gap-4">
           <div>
             © 2026 ProLnk. All rights reserved. ·{' '}
-            <a href="#privacy" className="hover:text-white transition-colors">
-              Privacy & terms
-            </a>
+            <button
+              type="button"
+              onClick={() => go('how', 'privacy')}
+              className="hover:text-slate-900 underline transition-colors cursor-pointer"
+            >
+              Privacy &amp; terms
+            </button>
           </div>
-
-          <div className="text-slate-400">
-            Made by Pablo, Lourdes, Juan Andrés and Juan Andrés.
-          </div>
+          <div>ProLnk Learning Technologies</div>
         </div>
 
       </div>

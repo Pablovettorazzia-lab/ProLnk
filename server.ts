@@ -3,7 +3,8 @@ import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel } from '@google/genai';
+import type { Part } from '@google/genai';
 
 dotenv.config();
 
@@ -11,130 +12,405 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
 
-// Initialize Google Gen AI client on the server side
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    }
-  }
-});
-
-// Helper to generate high quality educational answers if Gemini API key is missing or fails
-function generateSmartEducationalAnswer(question: string): string {
-  const q = question.toLowerCase();
-  const isSpanish = /[áéíóúñ¿¡]/.test(q) || q.includes('como') || q.includes('cual') || q.includes('qué') || q.includes('derivad') || q.includes('física') || q.includes('química') || q.includes('resolver') || q.includes('explic');
-
-  if (q.includes('derivad') || q.includes('derivative') || q.includes('calcul') || q.includes('integral')) {
-    if (isSpanish) {
-      return `Solución paso a paso para cálculo:
-1. Identifica la función principal y las reglas aplicables (regla de la cadena, producto o cociente).
-2. Para f(x), calculamos f'(x) = lim(h->0) [f(x+h) - f(x)] / h o aplicamos la fórmula diferencial correspondiente.
-3. Simplifica los términos algebraicos y factoriza los factores comunes.
-4. Evalúa en los puntos críticos si se solicitan máximos o mínimos locales.
-Source: Stewart Cálculo Multivariable y Trascendentes Tempranas (8va Edición), Capítulo 3`;
-    }
-    return `Step-by-step calculus resolution:
-1. Identify the primary function and apply standard differentiation rules (chain rule d/dx[f(g(x))] = f'(g(x))·g'(x) or integration by parts).
-2. Differentiate each term systematically, factoring out common exponential or polynomial coefficients.
-3. Simplify boundary values and verify continuity across the domain.
-Source: Stewart Calculus: Early Transcendentals (8th Edition), Chapter 3`;
-  }
-
-  if (q.includes('físic') || q.includes('physics') || q.includes('fuerza') || q.includes('force') || q.includes('energ')) {
-    if (isSpanish) {
-      return `Desglose de física paso a paso:
-1. Dibuja el diagrama de cuerpo libre (DCL) y define los ejes de coordenadas positivos.
-2. Aplica la Segunda Ley de Newton (ΣF = m·a) o el Principio de Conservación de Energía Mecánica (E_inicial = E_final).
-3. Si hay fricción o resistencia, añade el trabajo no conservativo: W_nc = ΔE.
-4. Despeja la variable requerida verificando unidades en el Sistema Internacional (SI).
-Source: Giancoli Física: Principios con Aplicaciones (7ma Edición), Capítulo 4`;
-    }
-    return `Physics problem breakdown:
-1. Sketch a free-body diagram (FBD) and establish coordinate directions.
-2. Apply Newton's Second Law (ΣF = m·a) or Conservation of Mechanical Energy (E_initial = E_final).
-3. Account for frictional dissipation W_f = μ·N·d if applicable.
-4. Solve for the requested unknown and check dimensional units in SI.
-Source: Giancoli Physics: Principles with Applications (7th Edition), Chapter 4`;
-  }
-
-  if (q.includes('químic') || q.includes('chemistry') || q.includes('reaccion') || q.includes('molecul')) {
-    if (isSpanish) {
-      return `Explicación de química:
-1. Balancea la ecuación química asegurando la conservación de masa de cada elemento.
-2. Determina las relaciones estequiométricas molares entre reactivos y productos.
-3. Calcula el reactivo limitante comparando las cantidades disponibles con los coeficientes estequeométricos.
-4. Aplica la masa molar (g/mol) para convertir a gramos finales o volumen molar si son gases (PV = nRT).
-Source: Chang Química General (12va Edición), Capítulo 3`;
-    }
-    return `Chemistry solution:
-1. Balance the chemical equation to ensure stoichiometric conservation of mass.
-2. Convert given quantities to moles using molar masses (n = m / M).
-3. Identify the limiting reactant by comparing mole ratios to the balanced equation.
-4. Calculate theoretical yield and apply ideal gas law (PV = nRT) if gas phases are present.
-Source: Chang Chemistry (12th Edition), Chapter 3`;
-  }
-
-  if (isSpanish) {
-    return `Explicación académica ProLnk:
-1. Comprender el problema: Se identifican los datos dados, las variables desconocidas y las restricciones del enunciado.
-2. Modelo conceptual: Aplicamos los teoremas fundamentales de la disciplina y planteamos las ecuaciones base.
-3. Resolución: Ejecutamos el desarrollo algebraico paso a paso para evitar errores de signo o redondeo.
-4. Verificación: Comprobamos que el resultado tenga sentido dimensional y físico en el contexto del ejercicio.
-Source: Base Académica Peer-Reviewed OpenStax / Guía Universitaria ProLnk`;
-  }
-
-  return `ProLnk Academic Solution:
-1. Understand the core concept: Define known parameters, constraints, and target unknowns.
-2. Apply fundamental theorems: Establish governing equations and state mathematical relationships.
-3. Solve systematically: Carry through algebraic steps cleanly to prevent sign and coefficient mistakes.
-4. Check validity: Ensure the final result has consistent dimensions and satisfies domain boundaries.
-Source: OpenStax College Standards & Peer-Reviewed Curriculum`;
+// Initialize Google Gen AI client lazily on the server side
+function getAiClient(): GoogleGenAI {
+  return new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
+    },
+  });
 }
 
-// API endpoint for real ProLnk AI homework assistant
+const PRIMARY_MODEL = 'gemini-4-hydrogen';
+const LITE_FALLBACK_MODEL = 'gemini-3.1-flash-lite';
+
+const ALLOWED_DOCUMENT_MIME_TYPES = new Set([
+  'application/pdf',
+  'text/plain',
+  'text/csv',
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+]);
+
+interface UploadedDocumentInput {
+  name: string;
+  mimeType: string;
+  base64Data: string;
+}
+
+interface VerifiedSource {
+  title: string;
+  uri?: string;
+  type: 'web' | 'document' | 'textbook';
+}
+
+function sanitizeDocuments(rawDocs: unknown): UploadedDocumentInput[] {
+  if (!Array.isArray(rawDocs)) return [];
+  const valid: UploadedDocumentInput[] = [];
+  for (const item of rawDocs.slice(0, 3)) {
+    if (
+      item &&
+      typeof item === 'object' &&
+      typeof (item as any).name === 'string' &&
+      typeof (item as any).mimeType === 'string' &&
+      typeof (item as any).base64Data === 'string' &&
+      ALLOWED_DOCUMENT_MIME_TYPES.has((item as any).mimeType) &&
+      (item as any).base64Data.length > 0 &&
+      (item as any).base64Data.length <= 12 * 1024 * 1024
+    ) {
+      valid.push({
+        name: (item as any).name.slice(0, 140),
+        mimeType: (item as any).mimeType,
+        base64Data: (item as any).base64Data,
+      });
+    }
+  }
+  return valid;
+}
+
+function extractVerifiedSources(
+  response: any,
+  attachedDocs: UploadedDocumentInput[]
+): { sources: VerifiedSource[]; searchQueries: string[] } {
+  const sources: VerifiedSource[] = [];
+  const seenUris = new Set<string>();
+
+  for (const doc of attachedDocs) {
+    sources.push({
+      title: `Uploaded: ${doc.name}`,
+      type: 'document',
+    });
+  }
+
+  const groundingMetadata = response?.candidates?.[0]?.groundingMetadata;
+  const chunks = groundingMetadata?.groundingChunks;
+  if (Array.isArray(chunks)) {
+    for (const chunk of chunks) {
+      const uri = chunk?.web?.uri;
+      if (typeof uri === 'string' && uri.startsWith('http') && !seenUris.has(uri)) {
+        seenUris.add(uri);
+        let fallbackHost = uri;
+        try {
+          fallbackHost = new URL(uri).hostname.replace(/^www\./, '');
+        } catch {
+          // keep uri
+        }
+        const title =
+          typeof chunk.web.title === 'string' && chunk.web.title.trim()
+            ? chunk.web.title.trim()
+            : fallbackHost;
+        sources.push({
+          title,
+          uri,
+          type: 'web',
+        });
+      }
+    }
+  }
+
+  const searchQueries = Array.isArray(groundingMetadata?.webSearchQueries)
+    ? groundingMetadata.webSearchQueries.filter(
+        (q: unknown): q is string => typeof q === 'string' && q.trim().length > 0
+      )
+    : [];
+
+  return { sources, searchQueries };
+}
+
+function getErrorStatus(err: any): number {
+  if (typeof err?.status === 'number') return err.status;
+  if (typeof err?.code === 'number') return err.code;
+  const msg = String(err?.message || '');
+  if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')) return 429;
+  if (msg.includes('403') || msg.includes('PERMISSION_DENIED')) return 403;
+  if (msg.includes('400') || msg.includes('API_KEY_INVALID')) return 400;
+  return 502;
+}
+
+function formatFriendlyGeminiError(err: any): { status: number; message: string } {
+  const status = getErrorStatus(err);
+  if (status === 429) {
+    return {
+      status: 429,
+      message:
+        'Gemini API quota or rate limit exceeded (429). Please wait a moment and try again, or select a billing-enabled API key in Settings > Secrets.',
+    };
+  }
+  if (status === 403 || status === 400) {
+    return {
+      status,
+      message:
+        'Gemini API key permission or configuration issue. Please verify your API key in Settings > Secrets.',
+    };
+  }
+  return {
+    status: 502,
+    message: 'Unable to reach ProLnk AI right now. Please try again in a moment.',
+  };
+}
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function generateWithRetryAndGrounding(params: {
+  contents: any;
+  systemInstruction: string;
+  useWebSearch: boolean;
+}) {
+  const ai = getAiClient();
+  const { contents, systemInstruction, useWebSearch } = params;
+
+  // Attempt 1: Primary model (gemini-4-hydrogen, LOW thinking to preserve quota) + optional Google Search Grounding
+  try {
+    const response = await ai.models.generateContent({
+      model: PRIMARY_MODEL,
+      contents,
+      config: {
+        systemInstruction,
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+        ...(useWebSearch ? { tools: [{ googleSearch: {} }] } : {}),
+      },
+    });
+    return { response, usedWebSearch: useWebSearch, webGroundingSkipped: false };
+  } catch (err1: any) {
+    if (getErrorStatus(err1) !== 429) {
+      throw err1;
+    }
+
+    // Backoff before retrying without Google Search grounding (Search tool often has tighter free-tier quota)
+    await delay(900);
+
+    if (useWebSearch) {
+      try {
+        const response = await ai.models.generateContent({
+          model: PRIMARY_MODEL,
+          contents,
+          config: {
+            systemInstruction,
+            thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+          },
+        });
+        return { response, usedWebSearch: false, webGroundingSkipped: true };
+      } catch (err2: any) {
+        if (getErrorStatus(err2) !== 429) {
+          throw err2;
+        }
+      }
+    }
+
+    // Backoff and try lightweight Flash Lite model
+    await delay(1200);
+    const response = await ai.models.generateContent({
+      model: LITE_FALLBACK_MODEL,
+      contents,
+      config: {
+        systemInstruction,
+      },
+    });
+    return { response, usedWebSearch: false, webGroundingSkipped: useWebSearch };
+  }
+}
+
+// Single-turn grounded academic question endpoint
 app.post('/api/ai/ask', async (req, res) => {
   try {
-    const { question } = req.body;
-    if (!question || typeof question !== 'string') {
+    const { question, documents, groundingMode } = req.body || {};
+    if (!question || typeof question !== 'string' || !question.trim()) {
       return res.status(400).json({ error: 'Question is required' });
     }
 
     if (!process.env.GEMINI_API_KEY) {
-      const reply = generateSmartEducationalAnswer(question);
-      return res.json({ reply });
-    }
-
-    try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: question,
-        config: {
-          systemInstruction: `You are ProLnk AI, an elite 24/7 academic homework helper and college tutor.
-Explain the student's question step-by-step with clear logic, easy-to-digest notation, and helpful intuition.
-Always reply in the EXACT SAME LANGUAGE as the student's prompt (e.g. Spanish if the user asks in Spanish, English if in English).
-Keep your response concise and focused (under 140 words).
-ALWAYS conclude your explanation on a new line with an authoritative textbook citation strictly formatted as:
-Source: [Author/Textbook Title, Edition, Chapter/Section]
-Example: Source: Stewart Calculus (8th Ed), Section 3.9`,
-          temperature: 0.6,
-        }
+      return res.status(503).json({
+        error: 'Gemini AI is not configured on this server. Please check Settings > Secrets.',
       });
-
-      const reply = response.text || generateSmartEducationalAnswer(question);
-      return res.json({ reply });
-    } catch (genError: any) {
-      console.warn('Gemini generateContent fallback:', genError?.message || genError);
-      const reply = generateSmartEducationalAnswer(question);
-      return res.json({ reply });
     }
+
+    const attachedDocs = sanitizeDocuments(documents);
+    const useWebSearch = groundingMode !== 'document';
+
+    const userParts: Part[] = [];
+    for (const doc of attachedDocs) {
+      userParts.push({
+        inlineData: {
+          mimeType: doc.mimeType,
+          data: doc.base64Data,
+        },
+      });
+    }
+
+    const docContextPrefix =
+      attachedDocs.length > 0
+        ? `Attached study files (${attachedDocs.map((d) => d.name).join(', ')}). Cite specific section titles, headings, or page numbers directly visible in these files.\n\n`
+        : '';
+
+    userParts.push({ text: `${docContextPrefix}${question.trim()}` });
+
+    const { response, usedWebSearch, webGroundingSkipped } = await generateWithRetryAndGrounding({
+      contents: [{ role: 'user', parts: userParts }],
+      useWebSearch,
+      systemInstruction: `You are ProLnk AI, a 24/7 academic homework helper and university tutor.
+Explain the student's question step-by-step with clear logic, mathematical notation, and intuition.
+Always reply in the EXACT SAME LANGUAGE as the student's prompt (e.g., Spanish if the user asks in Spanish, English if in English).
+Keep your response focused and well-structured (under 180 words unless solving a multi-part problem).
+CRITICAL VERIFICATION RULES:
+- NEVER invent, guess, or fabricate textbook editions, chapter numbers, page numbers, or URLs from memory.
+- If the student uploaded study files, ground your answer in those files and explicitly cite the exact file name and visible section/page you read.
+- Do NOT manually append a fake "Source:" line at the end because verified source links are rendered automatically by the app.`,
+    });
+
+    const reply = response.text?.trim();
+    if (!reply) {
+      return res.status(502).json({ error: 'Empty response received from Gemini.' });
+    }
+
+    const { sources, searchQueries } = extractVerifiedSources(response, attachedDocs);
+    const resolvedMode =
+      attachedDocs.length > 0 && usedWebSearch
+        ? 'hybrid'
+        : attachedDocs.length > 0
+        ? 'document'
+        : usedWebSearch
+        ? 'web'
+        : 'standard';
+
+    return res.json({
+      reply,
+      sources,
+      searchQueries,
+      mode: resolvedMode,
+      webGroundingSkipped,
+    });
   } catch (error: any) {
-    console.error('ProLnk AI API error:', error?.message || error);
-    const reply = generateSmartEducationalAnswer(req.body?.question || '');
-    return res.json({ reply });
+    const formatted = formatFriendlyGeminiError(error);
+    console.warn(`ProLnk AI /api/ai/ask (${formatted.status}):`, error?.message || error);
+    return res.status(formatted.status).json({
+      error: formatted.message,
+    });
+  }
+});
+
+// Multi-turn grounded ProLnk AI tutor & study assistant
+app.post('/api/ai/chat', async (req, res) => {
+  try {
+    const { message, history = [], documents, groundingMode = 'hybrid' } = req.body || {};
+    if (!message || typeof message !== 'string' || !message.trim()) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(503).json({
+        error: 'Gemini AI is not configured on this server. Please check Settings > Secrets.',
+      });
+    }
+
+    const attachedDocs = sanitizeDocuments(documents);
+    const useWebSearch = groundingMode !== 'document';
+
+    const systemInstruction = `You are ProLnk AI, an elite 24/7 academic tutor and intelligent assistant for the ProLnk education platform.
+You assist university and high school students with homework, exam prep, uploaded study notes/PDFs, and navigating ProLnk.
+
+KNOWLEDGE OF PROLNK PLATFORM FEATURES:
+1. 1-on-1 Human Tutoring: Verified tutors from top universities. Tutors include:
+   - Daniela Ríos: Calculus, Differential Equations & Physics (Q135/hr)
+   - Gabriel Castillo: Linear Algebra, Algorithms & Python/C++ (Q125/hr)
+   - Sofia Chang: Organic Chemistry & Biochemistry (Q120/hr)
+   - Lucas Méndez: Probability & Microeconomics (Q130/hr)
+   - Urgent Matching: connect with a tutor in ~15 minutes for a +Q25 upgrade.
+2. 3-Day Free Trial: Full access to 24/7 verified AI tutoring and 1 free community question.
+3. Pricing Plans:
+   - Starter Plan (Q120/mo): 1 hour of 1-on-1 tutoring + 50 AI questions/mo.
+   - Plus Plan (Q240/mo): 3 hours of 1-on-1 tutoring + unlimited AI questions + session whiteboard notes.
+   - Unlimited STEM Plan (Q450/mo): 6 hours of 1-on-1 tutoring + urgent priority matching + unlimited AI questions.
+4. Community Homework Board & Student Portal: Tracks study streak, XP progress, sessions, whiteboard notes, and uploaded study documents.
+
+VERIFICATION & CITATION RULES (CRITICAL):
+- Always reply in the EXACT SAME LANGUAGE as the user (Spanish if Spanish, English if English).
+- NEVER invent or fabricate textbook editions, chapter numbers, page numbers, or URLs from memory.
+- If the user attached study documents (PDF, TXT, MD, or homework images), read them carefully and cite exact headings, quotes, or page numbers directly observed in the attached files (e.g., "From your file Calculus_Notes.pdf, p. 3...").
+- If answering using Document-Only mode and the answer is not inside the attached document, clearly tell the student it wasn't found in their uploaded file rather than guessing.
+- Do NOT manually write a fake "Source:" footer line—the UI automatically displays clickable verified source links when available.
+- For ProLnk platform inquiries, you may append ONE action tag at the very end when helpful:
+  - [ACTION:book_expert]
+  - [ACTION:start_trial]
+  - [ACTION:view_pricing]
+  - [ACTION:ask_community]
+- Keep responses clear, accurate, step-by-step, and concise (under 180 words unless solving complex multi-step math).`;
+
+    const contents: Array<{ role: 'user' | 'model'; parts: Part[] }> = [];
+    if (Array.isArray(history)) {
+      for (const turn of history.slice(-10)) {
+        if (turn && typeof turn.text === 'string' && turn.text.trim()) {
+          contents.push({
+            role: turn.role === 'model' || turn.role === 'ai' ? 'model' : 'user',
+            parts: [{ text: turn.text }],
+          });
+        }
+      }
+    }
+
+    const currentUserParts: Part[] = [];
+    for (const doc of attachedDocs) {
+      currentUserParts.push({
+        inlineData: {
+          mimeType: doc.mimeType,
+          data: doc.base64Data,
+        },
+      });
+    }
+
+    const docHeader =
+      attachedDocs.length > 0
+        ? `[Attached study materials: ${attachedDocs.map((d) => d.name).join(', ')}]\n`
+        : '';
+
+    currentUserParts.push({
+      text: `${docHeader}${message.trim()}`,
+    });
+
+    contents.push({
+      role: 'user',
+      parts: currentUserParts,
+    });
+
+    const { response, usedWebSearch, webGroundingSkipped } = await generateWithRetryAndGrounding({
+      contents,
+      systemInstruction,
+      useWebSearch,
+    });
+
+    const reply = response.text?.trim();
+    if (!reply) {
+      return res.status(502).json({ error: 'Empty response received from Gemini.' });
+    }
+
+    const { sources, searchQueries } = extractVerifiedSources(response, attachedDocs);
+    const resolvedMode =
+      attachedDocs.length > 0 && usedWebSearch
+        ? 'hybrid'
+        : attachedDocs.length > 0
+        ? 'document'
+        : usedWebSearch
+        ? 'web'
+        : 'standard';
+
+    return res.json({
+      reply,
+      sources,
+      searchQueries,
+      mode: resolvedMode,
+      webGroundingSkipped,
+    });
+  } catch (error: any) {
+    const formatted = formatFriendlyGeminiError(error);
+    console.warn(`ProLnk AI /api/ai/chat (${formatted.status}):`, error?.message || error);
+    return res.status(formatted.status).json({
+      error: formatted.message,
+    });
   }
 });
 

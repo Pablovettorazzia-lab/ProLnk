@@ -4,138 +4,121 @@ import { Bot, Users, UserCheck, Zap, ArrowRight } from 'lucide-react';
 interface SpeedLadderProps {
   onOpenTrialModal: () => void;
   onExploreExperts: () => void;
+  onBrowseCommunity?: () => void;
 }
 
-export const SpeedLadder: React.FC<SpeedLadderProps> = ({ onOpenTrialModal, onExploreExperts }) => {
+export const SpeedLadder: React.FC<SpeedLadderProps> = ({
+  onOpenTrialModal,
+  onExploreExperts,
+  onBrowseCommunity
+}) => {
   const ladderItems = [
     {
       id: 'ai',
       icon: Bot,
       title: 'Ask the AI',
-      description: 'A chatbot trained by our academic specialists. Explains step by step and cites textbook sources.',
-      timeLabel: 'Seconds',
-      timeSub: 'to a first answer',
-      costLabel: 'Free',
-      costSub: 'unlimited during your trial',
-      highlight: false,
-      badge: 'Fastest',
+      description: 'Step-by-step explanations grounded in real textbook sources.',
+      meta: 'Seconds · Free trial',
       action: onOpenTrialModal,
-      actionText: 'Try AI Now'
+      actionText: 'Try AI',
+      featured: false
     },
     {
       id: 'community',
       icon: Users,
       title: 'Ask the community',
-      description: 'Post your question or explain your assignment. Fellow students and verified tutors reply and vote.',
-      timeLabel: 'Under 1 hr',
-      timeSub: 'typical first reply',
-      costLabel: 'Free',
-      costSub: 'always free for all students',
-      highlight: false,
-      badge: 'Collaborative',
+      description: 'Post assignments and get verified peer and TA replies.',
+      meta: 'Under 1 hr · Always free',
       action: () => {
+        if (onBrowseCommunity) {
+          onBrowseCommunity();
+          return;
+        }
         const el = document.getElementById('community');
         if (el) el.scrollIntoView({ behavior: 'smooth' });
       },
-      actionText: 'Browse Forum'
+      actionText: 'Browse forum',
+      featured: false
     },
     {
       id: 'expert',
       icon: UserCheck,
-      title: 'Match with an expert',
-      description: 'A verified tutor or professional for your specific subject. Book a private 1-on-1 session and get notes afterward.',
-      timeLabel: 'Same day',
-      timeSub: 'you pick the exact hour',
-      costLabel: 'From Q120',
-      costSub: 'per 1-hour private session',
-      highlight: true,
-      badge: 'Most Popular',
+      title: '1-on-1 Verified Tutor',
+      description: 'Private live whiteboard session with a vetted subject specialist.',
+      meta: 'Same day · From Q120',
       action: onExploreExperts,
-      actionText: 'View Tutors'
+      actionText: 'View tutors',
+      featured: true
     },
     {
       id: 'urgent',
       icon: Zap,
-      title: 'Urgent live help',
-      description: 'An optional upgrade for when your exam or deadline is tonight. We ping the highest-rated tutor online right now.',
-      timeLabel: '~15 mins',
-      timeSub: 'to a live tutor call',
-      costLabel: '+Q25',
-      costSub: 'added to any session',
-      highlight: false,
-      badge: 'Emergency',
+      title: 'Urgent Live Help',
+      description: 'Instant alert to top online tutors before tonight’s deadline.',
+      meta: '~15 mins · +Q25',
       action: onExploreExperts,
-      actionText: 'Request Urgent'
+      actionText: 'Request help',
+      featured: false
     }
   ];
 
   return (
-    <section id="speeds" className="py-16 md:py-24 bg-[#091124] border-b border-slate-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center max-w-3xl mx-auto mb-12">
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-white font-display tracking-tight">
-            Pick the speed you need.
-          </h2>
-          <p className="mt-3 text-base sm:text-lg text-slate-300">
-            Start completely free with our AI and move up to a human expert only when you want personalized 1-on-1 attention.
+    <section id="speeds" className="py-16 md:py-20 bg-white border-b border-slate-200/70">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-12">
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0F2249]/80">
+              Four ways to get unstuck
+            </div>
+            <h2 className="mt-2 text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight">
+              Pick the <span className="font-serif-accent text-[#0F2249] font-normal">speed</span> you need.
+            </h2>
+          </div>
+          <p className="text-sm text-slate-600 max-w-md">
+            Start free with cited AI, or step up to a live specialist only when you want personal coaching.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {ladderItems.map(item => {
             const Icon = item.icon;
             return (
               <div
                 key={item.id}
-                className={`relative rounded-2xl p-6 transition-all duration-200 flex flex-col justify-between ${
-                  item.highlight
-                    ? 'bg-[#0f1f42] border-2 border-[#F6C62B] shadow-xl shadow-[#F6C62B]/10'
-                    : 'bg-[#0c162e] border border-slate-700/70 hover:border-slate-600'
+                onClick={item.action}
+                className={`rounded-2xl p-6 flex flex-col justify-between transition-all duration-200 cursor-pointer group ${
+                  item.featured
+                    ? 'bg-[#0F2249] text-white shadow-xl shadow-[#0F2249]/20'
+                    : 'bg-[#FAFAF7] hover:bg-white border border-slate-300/80 hover:border-[#0F2249]/35 hover:shadow-lg'
                 }`}
               >
                 <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${
-                      item.highlight ? 'bg-[#F6C62B] text-slate-950' : 'bg-slate-800 text-[#F6C62B]'
-                    }`}>
-                      <Icon className="w-5 h-5" />
-                    </div>
-                    <span className={`text-[11px] font-bold uppercase tracking-wider ${
-                      item.highlight ? 'text-[#F6C62B]' : 'text-slate-400'
-                    }`}>
-                      {item.badge}
-                    </span>
+                  <div
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center mb-5 ${
+                      item.featured
+                        ? 'bg-[#F5C542] text-slate-950'
+                        : 'bg-white border border-slate-300 text-[#0F2249]'
+                    }`}
+                  >
+                    <Icon className="w-5 h-5" />
                   </div>
 
-                  <h3 className="text-xl font-bold text-white font-display">{item.title}</h3>
-                  <p className="mt-2 text-xs sm:text-sm text-slate-300 leading-relaxed min-h-[56px]">
+                  <h3 className={`text-lg font-bold ${item.featured ? 'text-white' : 'text-slate-950'}`}>
+                    {item.title}
+                  </h3>
+                  <p className={`mt-2 text-xs sm:text-sm leading-relaxed ${item.featured ? 'text-slate-200' : 'text-slate-700'}`}>
                     {item.description}
                   </p>
                 </div>
 
-                <div className="mt-6 pt-5 border-t border-slate-700/60 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-lg font-bold text-white font-display leading-tight">{item.timeLabel}</div>
-                      <div className="text-[11px] text-slate-400">{item.timeSub}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-lg font-bold text-[#F6C62B] font-display leading-tight">{item.costLabel}</div>
-                      <div className="text-[11px] text-slate-400">{item.costSub}</div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={item.action}
-                    className={`w-full py-2.5 px-3 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-                      item.highlight
-                        ? 'bg-[#F6C62B] hover:bg-[#ffd744] text-slate-950'
-                        : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
-                    }`}
-                  >
+                <div className={`mt-6 pt-4 border-t flex items-center justify-between ${item.featured ? 'border-white/15' : 'border-slate-300/70'}`}>
+                  <span className={`text-[11px] font-semibold font-mono-nums ${item.featured ? 'text-[#F5C542]' : 'text-slate-700'}`}>
+                    {item.meta}
+                  </span>
+                  <span className={`text-xs font-bold inline-flex items-center gap-1 group-hover:translate-x-0.5 transition-transform ${item.featured ? 'text-white' : 'text-[#0F2249]'}`}>
                     <span>{item.actionText}</span>
                     <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
+                  </span>
                 </div>
               </div>
             );

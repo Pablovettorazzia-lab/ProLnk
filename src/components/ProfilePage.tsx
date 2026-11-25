@@ -23,16 +23,22 @@ import {
   User,
   ShieldCheck,
   Award,
-  Plus
+  Plus,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { AuthUser } from '../App';
+import { StudyProgressChart } from './StudyProgressChart';
 
 interface ProfilePageProps {
   user: AuthUser;
+  sessionsCount?: number;
   onBackToDashboard: () => void;
   onViewLandingPage?: () => void;
   onLogOut: () => void;
   onUpdateProfile?: (updated: Partial<AuthUser>) => void;
+  isDarkMode?: boolean;
+  onToggleDarkMode?: () => void;
 }
 
 const PRESET_AVATARS = [
@@ -57,9 +63,12 @@ const SUGGESTED_SUBJECTS = [
 
 export const ProfilePage: React.FC<ProfilePageProps> = ({
   user,
+  sessionsCount = 3,
   onBackToDashboard,
   onLogOut,
-  onUpdateProfile
+  onUpdateProfile,
+  isDarkMode = false,
+  onToggleDarkMode
 }) => {
   // Form state
   const [profileName, setProfileName] = useState(user.name || '');
@@ -138,28 +147,39 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-[#070d1c] text-slate-100 flex flex-col font-sans antialiased selection:bg-[#F6C62B] selection:text-slate-950">
+    <div className={`${!isDarkMode ? 'portal-light bg-[#FAFAF7] text-slate-900' : 'bg-[#070d1c] text-slate-100'} min-h-screen flex flex-col font-sans antialiased selection:bg-[#F6C62B] selection:text-slate-950`}>
       
       {/* Top Header Bar */}
-      <header className="sticky top-0 z-40 bg-[#0a1329]/95 backdrop-blur-md border-b border-slate-800 h-16 px-4 sm:px-8 flex items-center justify-between">
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 h-16 px-4 sm:px-8 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
             onClick={onBackToDashboard}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-semibold cursor-pointer transition-all hover:scale-102"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 text-xs font-semibold cursor-pointer transition-all"
             title="Return to Student Portal"
           >
-            <ArrowLeft className="w-4 h-4 text-[#F6C62B]" />
+            <ArrowLeft className="w-4 h-4 text-[#0F2249]" />
             <span>Back to Portal</span>
           </button>
 
-          <div className="hidden sm:flex items-center gap-2 pl-3 border-l border-slate-800">
-            <ProLnkLogo size="sm" light={true} showWordmark={true} />
-            <span className="text-slate-500 text-xs">/</span>
-            <span className="text-xs font-semibold text-slate-300">Student Profile</span>
+          <div className="hidden sm:flex items-center gap-2 pl-3 border-l border-slate-200">
+            <ProLnkLogo size="sm" light={isDarkMode} showWordmark={true} />
+            <span className="text-slate-400 text-xs">/</span>
+            <span className="text-xs font-semibold text-slate-600">Student Profile</span>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
+          {onToggleDarkMode && (
+            <button
+              type="button"
+              onClick={onToggleDarkMode}
+              className="p-2 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 cursor-pointer transition-colors"
+              title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              aria-label={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            >
+              {isDarkMode ? <Sun className="w-4 h-4 text-[#F5C542]" /> : <Moon className="w-4 h-4 text-[#0F2249]" />}
+            </button>
+          )}
           <button
             onClick={() => handleSaveProfile()}
             disabled={isSaving}
@@ -171,7 +191,11 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
           <button
             onClick={onLogOut}
-            className="text-xs font-semibold text-rose-300 hover:text-white bg-rose-500/10 hover:bg-rose-600 border border-rose-500/30 px-3.5 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:scale-102"
+            className={`text-xs font-semibold px-3.5 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm border ${
+              isDarkMode
+                ? 'text-rose-300 hover:text-white bg-rose-500/10 hover:bg-rose-600 border-rose-500/30'
+                : 'text-rose-700 hover:text-white bg-rose-50 hover:bg-rose-600 border-rose-200'
+            }`}
             title="Safely log out and return to the home page"
           >
             <LogOut className="w-3.5 h-3.5" />
@@ -192,7 +216,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
             {/* Student Summary Card */}
             <div className="bg-[#0c162e] border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
               {/* Cover Banner */}
-              <div className="h-28 bg-gradient-to-r from-[#0F2249] via-[#162e63] to-[#0a1530] relative">
+              <div className="portal-hero-banner h-28 bg-gradient-to-r from-[#0F2249] via-[#162e63] to-[#0a1530] relative">
                 <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#F6C62B_1px,transparent_1px)] [background-size:14px_14px]"></div>
                 <div className="absolute top-3 right-3">
                   <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-300 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-md backdrop-blur-sm">
@@ -211,10 +235,16 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                       <img
                         src={profilePhotoURL}
                         alt={profileName}
-                        className="w-20 h-20 rounded-2xl object-cover border-4 border-[#0c162e] shadow-lg bg-[#080f21]"
+                        className={`w-20 h-20 rounded-2xl object-cover border-4 shadow-lg bg-[#080f21] ${
+                          isDarkMode ? 'border-[#0c162e]' : 'border-white'
+                        }`}
                       />
                     ) : (
-                      <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#0F2249] to-[#F6C62B] text-white font-extrabold text-2xl flex items-center justify-center border-4 border-[#0c162e] shadow-lg">
+                      <div
+                        className={`w-20 h-20 rounded-2xl bg-gradient-to-br from-[#0F2249] to-[#F6C62B] text-white font-extrabold text-2xl flex items-center justify-center border-4 shadow-lg ${
+                          isDarkMode ? 'border-[#0c162e]' : 'border-white'
+                        }`}
+                      >
                         {profileName.split(' ').map(n => n[0]).join('').substring(0, 2) || 'U'}
                       </div>
                     )}
@@ -380,7 +410,15 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               RIGHT COLUMN: Main Configuration Workspaces
              ========================================================================= */}
           <div className="lg:col-span-8 space-y-6">
-            
+
+            {/* Past 30 Days XP Gain & Streak History Chart */}
+            <StudyProgressChart
+              xpPoints={user.xpPoints}
+              streakDays={user.streakDays}
+              sessionsCount={sessionsCount}
+              isDarkMode={isDarkMode}
+            />
+
             {/* Sub-tab 1: Personal & Academic Info */}
             {activeTab === 'info' && (
               <form onSubmit={handleSaveProfile} className="space-y-6">

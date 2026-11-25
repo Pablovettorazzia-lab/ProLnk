@@ -1,27 +1,54 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { AI_PRESET_QUESTIONS, EXPERTS_DATA } from '../data/mockData';
-import { Expert } from '../types';
-import { Check, Send, ArrowRight, UserCheck, CheckCircle2, Lock, Sparkles, Star } from 'lucide-react';
+import { Expert, StudyDocumentPayload, VerifiedSource } from '../types';
+import {
+  Send,
+  ArrowRight,
+  UserCheck,
+  CheckCircle2,
+  Lock,
+  Star,
+  BookOpen,
+  Paperclip,
+  X,
+  FileText,
+  AlertCircle
+} from 'lucide-react';
 import heroStudyImg from '../assets/images/hero_study.jpg';
+import { VerifiedSourcesBar } from './VerifiedSourcesBar';
+import { readStudyFile, MAX_STUDY_FILES } from '../utils/studyFiles';
 
 interface HeroProps {
   onOpenTrialModal: () => void;
   onBookExpert: (expert: Expert) => void;
+  onEnterDemo?: () => void;
   isSubscribed?: boolean;
+}
+
+interface HeroChatMessage {
+  id: string;
+  sender: 'user' | 'ai';
+  text: string;
+  source?: string;
+  sources?: VerifiedSource[];
+  searchQueries?: string[];
+  webGroundingSkipped?: boolean;
+  attachedFileNames?: string[];
+  expertId?: string;
+  isError?: boolean;
 }
 
 const FREE_QUESTION_LIMIT = 3;
 
-export const Hero: React.FC<HeroProps> = ({ onOpenTrialModal, onBookExpert, isSubscribed = false }) => {
+export const Hero: React.FC<HeroProps> = ({
+  onOpenTrialModal,
+  onBookExpert,
+  onEnterDemo,
+  isSubscribed = false
+}) => {
   const [selectedTopic, setSelectedTopic] = useState('Calculus');
   const [questionsCount, setQuestionsCount] = useState(0);
-  const [chatMessages, setChatMessages] = useState<{
-    id: string;
-    sender: 'user' | 'ai';
-    text: string;
-    source?: string;
-    expertId?: string;
-  }[]>([
+  const [chatMessages, setChatMessages] = useState<HeroChatMessage[]>([
     {
       id: 'm1',
       sender: 'user',
@@ -31,18 +58,29 @@ export const Hero: React.FC<HeroProps> = ({ onOpenTrialModal, onBookExpert, isSu
       id: 'm2',
       sender: 'ai',
       text: 'Start with y = ln(x), which means e^y = x.\nDifferentiate both sides: e^y · y′ = 1.\nSince e^y equals x, you get y′ = 1/x.\nTry it once yourself on ln(2x) to lock it in.',
-      source: 'OpenStax Calculus Volume 1, section 3.9',
+      source: 'OpenStax Calculus Volume 1, Section 3.9',
+      sources: [
+        {
+          title: 'OpenStax Calculus Vol. 1 · Sec. 3.9 (Derivatives of Logs)',
+          uri: 'https://openstax.org/books/calculus-volume-1/pages/3-9-derivatives-of-exponential-and-logarithmic-functions',
+          type: 'textbook'
+        }
+      ],
       expertId: 'daniela-rios'
     }
   ]);
 
   const [inputVal, setInputVal] = useState('');
+  const [attachedDocs, setAttachedDocs] = useState<StudyDocumentPayload[]>([]);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [savedFeedback, setSavedFeedback] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSelectPreset = (topic: string) => {
     setSelectedTopic(topic);
     setSavedFeedback(false);
+    setUploadError(null);
     const item = AI_PRESET_QUESTIONS.find(q => q.topic.toLowerCase() === topic.toLowerCase());
     if (item) {
       setIsTyping(true);
@@ -62,6 +100,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenTrialModal, onBookExpert, isSu
             sender: 'ai',
             text: item.answer,
             source: item.source,
+            sources: item.sources,
             expertId: item.expertId
           }
         ]);
@@ -70,17 +109,40 @@ export const Hero: React.FC<HeroProps> = ({ onOpenTrialModal, onBookExpert, isSu
     }
   };
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (files.length === 0) return;
+
+    setUploadError(null);
+    if (attachedDocs.length + files.length > MAX_STUDY_FILES) {
+      setUploadError(`You can attach up to ${MAX_STUDY_FILES} study files per message.`);
+      return;
+    }
+
+    try {
+      const encoded = await Promise.all(files.map(readStudyFile));
+      setAttachedDocs(prev => [...prev, ...encoded].slice(0, MAX_STUDY_FILES));
+    } catch (err: any) {
+      setUploadError(err?.message || 'Unable to attach file.');
+    }
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputVal.trim()) return;
+    if ((!inputVal.trim() && attachedDocs.length === 0) || isTyping) return;
 
     if (!isSubscribed && questionsCount >= FREE_QUESTION_LIMIT) {
       onOpenTrialModal();
       return;
     }
 
-    const userText = inputVal.trim();
+    const userText =
+      inputVal.trim() || 'Please explain and solve the attached study material step-by-step.';
+    const docsToSend = [...attachedDocs];
     setInputVal('');
+    setAttachedDocs([]);
+    setUploadError(null);
     setSavedFeedback(false);
     setQuestionsCount(prev => prev + 1);
 
@@ -89,95 +151,57 @@ export const Hero: React.FC<HeroProps> = ({ onOpenTrialModal, onBookExpert, isSu
       {
         id: Date.now() + '-u',
         sender: 'user',
-        text: userText
+        text: userText,
+        attachedFileNames: docsToSend.map(d => d.name)
       }
     ]);
 
     setIsTyping(true);
 
     try {
-      // Call server-side Gemini API
-      const res = await fetch('/api/ai/ask', {
+      const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: userText })
+        body: JSON.stringify({
+          message: userText,
+          history: chatMessages
+            .filter(m => !m.isError)
+            .map(m => ({
+              role: m.sender === 'user' ? 'user' : 'model',
+              text: m.text
+            })),
+          documents: docsToSend.map(d => ({
+            name: d.name,
+            mimeType: d.mimeType,
+            base64Data: d.base64Data
+          })),
+          groundingMode: 'hybrid',
+          userContext: { isSubscribed }
+        })
       });
 
       const data = await res.json();
 
-      if (data && data.reply) {
-        // Parse reply text and optional Source line
-        const lines = data.reply.split('\n');
-        let sourceLine = 'OpenStax Peer-Reviewed Curriculum Standards';
-        let bodyLines = [];
-
-        for (const line of lines) {
-          if (line.toLowerCase().startsWith('source:')) {
-            sourceLine = line.replace(/source:\s*/i, '').trim();
-          } else {
-            bodyLines.push(line);
-          }
-        }
-
-        const bodyText = bodyLines.join('\n').trim();
-
-        // Assign suitable expert for follow-up
-        const lower = userText.toLowerCase();
-        let expertId = 'daniela-rios';
-        if (lower.includes('physics') || lower.includes('gravity') || lower.includes('force') || lower.includes('speed')) {
-          expertId = 'andres-molina';
-        } else if (lower.includes('chemistry') || lower.includes('molecule') || lower.includes('reaction') || lower.includes('biology')) {
-          expertId = 'marcus-bell';
-        } else if (lower.includes('essay') || lower.includes('thesis') || lower.includes('writing') || lower.includes('grammar')) {
-          expertId = 'priya-nair';
-        } else if (lower.includes('python') || lower.includes('code') || lower.includes('programming') || lower.includes('sql')) {
-          expertId = 'tomas-herrera';
-        }
-
-        setChatMessages(prev => [
-          ...prev,
-          {
-            id: Date.now() + '-a',
-            sender: 'ai',
-            text: bodyText || data.reply,
-            source: sourceLine,
-            expertId: expertId
-          }
-        ]);
-        setIsTyping(false);
-        return;
+      if (!res.ok || !data?.reply) {
+        throw new Error(data?.error || 'Could not verify answer with ProLnk AI.');
       }
-    } catch {
-      // Ignore and fallback gracefully
-    }
 
-    // Fallback if API key is not configured or offline
-    setTimeout(() => {
-      let answerText = '';
-      let sourceText = '';
-      let expertId = 'daniela-rios';
+      const cleanLines = data.reply
+        .split('\n')
+        .filter((line: string) => !line.toLowerCase().startsWith('source:'))
+        .join('\n')
+        .trim();
 
       const lower = userText.toLowerCase();
-      if (lower.includes('integral') || lower.includes('derivative') || lower.includes('math') || lower.includes('calculus')) {
-        answerText = 'Here is the step-by-step method:\n1. Rewrite the expression into fundamental components.\n2. Apply the chain rule or integration by parts (LIATE rule).\n3. Check edge boundary limits to verify the final answer.';
-        sourceText = 'Stewart Calculus: Early Transcendentals (8th Ed), Section 4.3';
-        expertId = 'daniela-rios';
-      } else if (lower.includes('physics') || lower.includes('force') || lower.includes('acceleration') || lower.includes('momentum')) {
-        answerText = 'For this physics problem:\n1. Draw a clear free-body diagram showing all external forces.\n2. Set up Newton\'s 2nd Law equations: ΣFx = m·ax and ΣFy = m·ay.\n3. Solve for unknown components and check physical units.';
-        sourceText = 'Giancoli Physics: Principles with Applications (7th Ed), Chapter 4';
+      let expertId = 'daniela-rios';
+      if (lower.includes('physics') || lower.includes('gravity') || lower.includes('force') || lower.includes('speed')) {
         expertId = 'andres-molina';
-      } else if (lower.includes('chemistry') || lower.includes('reaction') || lower.includes('moles') || lower.includes('acid')) {
-        answerText = 'Key chemistry steps:\n1. Balance the chemical equation with correct integer coefficients.\n2. Convert given mass to moles (moles = mass / molar mass).\n3. Apply stoichiometric ratios to find limiting reagent and theoretical yield.';
-        sourceText = 'Atkins & Jones, Chemical Principles (6th Ed), Section 2.1';
+      } else if (lower.includes('chemistry') || lower.includes('molecule') || lower.includes('reaction') || lower.includes('biology')) {
         expertId = 'marcus-bell';
-      } else if (lower.includes('essay') || lower.includes('thesis') || lower.includes('argument')) {
-        answerText = 'To structure a persuasive academic thesis:\n1. Counter-argument: Acknowledge the primary opposing viewpoint.\n2. Central claim: State your specific, debatable stance.\n3. Rationale: Provide the "because" clause previewing your body evidence.';
-        sourceText = 'The Craft of Research (4th Ed), Chapter 9';
+      } else if (lower.includes('essay') || lower.includes('thesis') || lower.includes('writing') || lower.includes('grammar')) {
         expertId = 'priya-nair';
-      } else {
-        answerText = `Here is the step-by-step breakdown:\n1. Deconstruct the problem into foundational premises.\n2. Connect relevant course formulas to the given variables.\n3. Test the result against standard physical/mathematical invariants.`;
-        sourceText = 'OpenStax General College Curriculum (Peer-Reviewed Edition)';
-        expertId = 'daniela-rios';
+      } else if (lower.includes('python') || lower.includes('code') || lower.includes('programming') || lower.includes('sql')) {
+        expertId = 'tomas-herrera';
       }
 
       setChatMessages(prev => [
@@ -185,13 +209,29 @@ export const Hero: React.FC<HeroProps> = ({ onOpenTrialModal, onBookExpert, isSu
         {
           id: Date.now() + '-a',
           sender: 'ai',
-          text: answerText,
-          source: sourceText,
-          expertId: expertId
+          text: cleanLines || data.reply,
+          sources: Array.isArray(data.sources) ? data.sources : [],
+          searchQueries: Array.isArray(data.searchQueries) ? data.searchQueries : [],
+          webGroundingSkipped: Boolean(data.webGroundingSkipped),
+          expertId
         }
       ]);
+    } catch (err: any) {
+      setChatMessages(prev => [
+        ...prev,
+        {
+          id: Date.now() + '-err',
+          sender: 'ai',
+          text:
+            err?.message ||
+            'Unable to reach ProLnk AI right now. Please try again in a moment or match with a live tutor.',
+          isError: true,
+          expertId: 'daniela-rios'
+        }
+      ]);
+    } finally {
       setIsTyping(false);
-    }, 100);
+    }
   };
 
   const currentAiMessage = [...chatMessages].reverse().find(m => m.sender === 'ai');
@@ -202,143 +242,154 @@ export const Hero: React.FC<HeroProps> = ({ onOpenTrialModal, onBookExpert, isSu
   const hasReachedLimit = !isSubscribed && questionsCount >= FREE_QUESTION_LIMIT;
 
   return (
-    <section id="top" className="relative pt-10 pb-16 md:pt-16 md:pb-24 overflow-hidden border-b border-slate-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+    <section id="top" className="relative pt-14 pb-20 md:pt-20 md:pb-28 bg-[#FAFAF7] overflow-hidden border-b border-slate-200/70">
+      {/* Subtle Dreamy Warm Mesh */}
+      <div className="pointer-events-none absolute -top-24 -left-24 w-[480px] h-[480px] bg-sky-200/40 rounded-full blur-[110px]" />
+      <div className="pointer-events-none absolute top-10 right-0 w-[440px] h-[440px] bg-amber-200/45 rounded-full blur-[120px]" />
+
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-14 items-center">
           
-          {/* Left Column: Heading and CTAs matching original template and image.png */}
+          {/* Left Column: Simple, Serene Editorial Copy */}
           <div className="lg:col-span-6 space-y-6">
-            <h1 className="text-4xl sm:text-5xl lg:text-[3.6rem] text-white font-hero-headline" style={{ textWrap: 'balance' }}>
-              Homework help that doesn’t wait until morning.
-            </h1>
-
-            <p className="text-base sm:text-lg text-slate-300 leading-relaxed max-w-xl">
-              Ask our AI for an instant answer, then bring in a verified expert when you want a real person. Free to start, with a 3-day trial of the full service.
-            </p>
-
-            <div className="flex flex-wrap items-center gap-3 pt-2">
-              <button
-                onClick={onOpenTrialModal}
-                className="px-6 py-3.5 text-sm font-bold text-slate-950 bg-[#F6C62B] hover:bg-[#ffd644] rounded-lg shadow-lg shadow-[#F6C62B]/20 transition-all duration-150 cursor-pointer"
-              >
-                Start your free 3-day trial
-              </button>
-              <a
-                href="#how"
-                className="px-5 py-3.5 text-sm font-semibold text-white bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 rounded-lg transition-colors cursor-pointer"
-              >
-                See how it works
-              </a>
+            <div className="inline-flex items-center px-3 py-1 rounded-full bg-amber-100/80 border border-amber-300/80 text-[11px] font-bold uppercase tracking-[0.14em] text-[#0F2249]">
+              Web-Verified AI · Your Study PDFs · 1-on-1 Tutors
             </div>
 
-            {/* Checklist items matching original */}
-            <ul className="space-y-3 pt-4 text-xs sm:text-sm text-slate-300">
-              <li className="flex items-center gap-2.5">
-                <span className="p-1 rounded-full bg-[#F6C62B]/20 text-[#F6C62B] shrink-0">
-                  <Check className="w-3.5 h-3.5" strokeWidth={3} />
-                </span>
-                <span>Unlimited AI messages during your trial</span>
-              </li>
-              <li className="flex items-center gap-2.5">
-                <span className="p-1 rounded-full bg-[#F6C62B]/20 text-[#F6C62B] shrink-0">
-                  <Check className="w-3.5 h-3.5" strokeWidth={3} />
-                </span>
-                <span>Every AI answer shows where it comes from</span>
-              </li>
-              <li className="flex items-center gap-2.5">
-                <span className="p-1 rounded-full bg-[#F6C62B]/20 text-[#F6C62B] shrink-0">
-                  <Check className="w-3.5 h-3.5" strokeWidth={3} />
-                </span>
-                <span>Urgent help from a human in about 15 minutes</span>
-              </li>
-            </ul>
+            <h1
+              className="text-slate-950 font-hero-headline"
+              style={{ fontSize: 'clamp(2.5rem, 4.3vw, 3.9rem)', textWrap: 'balance' }}
+            >
+              Homework help that{' '}
+              <span className="font-serif-accent text-[#0F2249] font-normal">doesn’t wait</span>{' '}
+              until morning.
+            </h1>
 
-            {/* Visual Social Proof Card with Cinematic Study Photo */}
-            <div className="pt-2 flex items-center gap-3.5 p-3 rounded-2xl bg-[#0c162e]/90 border border-slate-700/80 shadow-xl max-w-lg">
+            <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-lg">
+              Get step-by-step AI answers backed by live web sources or your own uploaded PDFs and class notes, plus verified human tutors in minutes.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-3 pt-1">
+              <button
+                onClick={onOpenTrialModal}
+                className="px-6 py-3.5 text-sm font-semibold text-white bg-[#0F2249] hover:bg-[#19346b] rounded-full transition-colors cursor-pointer inline-flex items-center gap-2 shadow-lg shadow-[#0F2249]/15"
+              >
+                <span>Start free 3-day trial</span>
+                <ArrowRight className="w-4 h-4 text-[#F5C542]" />
+              </button>
+              {onEnterDemo && (
+                <button
+                  onClick={onEnterDemo}
+                  className="px-5 py-3.5 text-sm font-semibold text-[#0F2249] hover:text-slate-950 bg-white hover:bg-amber-50 border border-slate-300 hover:border-[#0F2249]/40 rounded-full transition-colors cursor-pointer shadow-sm"
+                >
+                  Enter Demo Portal
+                </button>
+              )}
+            </div>
+
+            {/* Clean Single Trust Strip */}
+            <div className="pt-6 mt-2 border-t border-slate-200/80 flex items-center gap-4 max-w-md">
               <img
                 src={heroStudyImg}
-                alt="Student studying advanced calculus and physics with ProLnk"
-                className="w-16 h-16 rounded-xl object-cover border border-[#F6C62B]/40 shrink-0 shadow-md"
+                alt="Student studying with ProLnk"
+                className="w-11 h-11 rounded-full object-cover border-2 border-white shadow-sm shrink-0"
               />
               <div className="text-xs">
-                <div className="font-bold text-white flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span>Trusted by 14,000+ STEM Students</span>
-                </div>
-                <div className="flex items-center gap-1 text-[#F6C62B] text-[11px] font-bold mt-0.5">
-                  <div className="flex">
+                <div className="flex items-center gap-1.5 text-slate-900 font-semibold">
+                  <div className="flex text-amber-500">
                     {[1, 2, 3, 4, 5].map(i => (
-                      <Star key={i} className="w-3 h-3 fill-[#F6C62B]" />
+                      <Star key={i} className="w-3.5 h-3.5 fill-amber-400" />
                     ))}
                   </div>
-                  <span className="text-slate-200">4.9/5 from verified college midterms</span>
+                  <span className="font-mono-nums">4.9/5</span>
+                  <span className="text-slate-400">·</span>
+                  <span>14,000+ students</span>
                 </div>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Average grade improvement of +18% on exams.
+                <p className="text-[11px] text-slate-600 mt-0.5">
+                  Real clickable web links &amp; PDF grounding · Live help in ~15 min
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Right Column: Live Working AI Chat with Question Limit */}
+          {/* Right Column: Bright Floating AI Tutor Workbench */}
           <div className="lg:col-span-6">
-            <div className="bg-[#0c162e] border border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[520px]">
+            <div className="studio-card rounded-3xl overflow-hidden flex flex-col h-[540px]">
               
-              {/* Chat Header */}
-              <div className="px-5 py-3.5 bg-[#080f21] border-b border-slate-800 flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-bold text-white font-display">ProLnk AI</h3>
-                  <div className="text-[11px] text-slate-400">Instant answers with cited academic sources</div>
+              {/* Clean Light Card Header */}
+              <div className="px-5 py-4 bg-white border-b border-slate-200/80 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-amber-100 border border-amber-300/80 text-[#0F2249] flex items-center justify-center">
+                    <BookOpen className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-950 leading-none">ProLnk AI Tutor</h3>
+                    <div className="text-[11px] text-slate-600 mt-0.5">Live web citations · PDF/notes upload</div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="flex h-2 w-2 relative">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                  </span>
-                  <span className="text-xs font-semibold text-emerald-400">Online 24/7</span>
-                </div>
+                <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-100/80 border border-emerald-200 px-2.5 py-1 rounded-full">
+                  Verified 24/7
+                </span>
               </div>
 
               {/* Chat Thread */}
-              <div className="flex-1 p-4 overflow-y-auto space-y-3.5 text-xs sm:text-sm">
+              <div className="flex-1 p-5 overflow-y-auto space-y-4 bg-[#FCFBF9] text-xs sm:text-sm">
                 {chatMessages.map(msg => (
                   <div
                     key={msg.id}
                     className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
                   >
                     <div
-                      className={`max-w-[88%] rounded-xl px-4 py-2.5 ${
+                      className={`max-w-[88%] rounded-2xl px-4 py-3 ${
                         msg.sender === 'user'
-                          ? 'bg-[#1b2f60] text-white border border-[#2b4486]'
-                          : 'bg-[#122144] text-slate-200 border border-slate-700/60 shadow-sm'
+                          ? 'bg-[#0F2249] text-white shadow-sm'
+                          : msg.isError
+                          ? 'bg-rose-50 text-rose-700 border border-rose-200 shadow-sm'
+                          : 'bg-white text-slate-700 border border-slate-200/80 shadow-sm'
                       }`}
                     >
+                      {msg.attachedFileNames && msg.attachedFileNames.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                          {msg.attachedFileNames.map(name => (
+                            <span
+                              key={name}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/15 text-[10px] font-medium"
+                            >
+                              <FileText className="w-3 h-3" />
+                              <span className="truncate max-w-[160px]">{name}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
                       <div className="whitespace-pre-line leading-relaxed">{msg.text}</div>
                       
-                      {/* Academic Textbook Source Line */}
-                      {msg.source && (
-                        <div className="mt-2.5 pt-2 border-t border-slate-700/60 text-[11px] text-[#F6C62B]">
-                          <span className="font-semibold text-slate-400">Source: </span>
-                          <span className="text-slate-200 italic">{msg.source}</span>
-                        </div>
+                      {!msg.isError && (
+                        <VerifiedSourcesBar
+                          sources={msg.sources}
+                          fallbackText={msg.source}
+                          searchQueries={msg.searchQueries}
+                          webGroundingSkipped={msg.webGroundingSkipped}
+                          variant="light"
+                          compact
+                        />
                       )}
                     </div>
 
-                    {/* Expert handoff buttons under AI answer */}
                     {msg.sender === 'ai' && (
-                      <div className="mt-2 flex flex-wrap items-center gap-2 pl-1">
+                      <div className="mt-2 flex flex-wrap items-center gap-2 pl-0.5">
                         <button
                           onClick={() => onBookExpert(matchedExpert)}
-                          className="px-3 py-1.5 rounded-md bg-[#F6C62B] hover:bg-[#ffd744] text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow transition-colors cursor-pointer"
+                          className="px-3 py-1.5 rounded-full bg-[#F5C542] hover:bg-[#ffd65c] text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                         >
                           <UserCheck className="w-3.5 h-3.5" />
-                          <span>Match me with an expert ({matchedExpert.name.split(' ')[0]})</span>
+                          <span>Match with {matchedExpert.name.split(' ')[0]}</span>
                         </button>
                         <button
                           onClick={() => setSavedFeedback(true)}
-                          className="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition-colors cursor-pointer"
+                          className="px-3 py-1.5 rounded-full bg-white hover:bg-slate-50 text-slate-600 text-xs font-medium border border-slate-200 transition-colors cursor-pointer"
                         >
-                          {savedFeedback ? 'Saved to notes!' : 'No thanks, that helped'}
+                          {savedFeedback ? 'Saved' : 'Save note'}
                         </button>
                       </div>
                     )}
@@ -346,33 +397,33 @@ export const Hero: React.FC<HeroProps> = ({ onOpenTrialModal, onBookExpert, isSu
                 ))}
 
                 {isTyping && (
-                  <div className="flex items-center gap-2 text-slate-400 text-xs bg-[#122144] w-fit px-3 py-2 rounded-lg border border-slate-700/50">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#F6C62B] animate-bounce"></span>
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#F6C62B] animate-bounce [animation-delay:0.2s]"></span>
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#F6C62B] animate-bounce [animation-delay:0.4s]"></span>
-                    <span className="text-[11px] ml-1">Analyzing curriculum & citing source...</span>
+                  <div className="flex items-center gap-2 text-slate-500 text-xs bg-white w-fit px-3.5 py-2 rounded-full border border-slate-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#0F2249] animate-bounce"></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#0F2249] animate-bounce [animation-delay:0.15s]"></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#0F2249] animate-bounce [animation-delay:0.3s]"></span>
+                    <span className="text-[11px] ml-1">Verifying live sources...</span>
                   </div>
                 )}
 
                 {savedFeedback && (
-                  <div className="p-2.5 rounded-lg bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
-                    <span>Saved to your personal dashboard notebook.</span>
+                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                    <span>Saved to your student notebook.</span>
                   </div>
                 )}
               </div>
 
-              {/* Preset question chips */}
-              <div className="px-4 py-2 bg-[#080f21] border-t border-slate-800 flex items-center gap-2 overflow-x-auto text-xs">
-                <span className="text-slate-400 shrink-0 font-medium text-[11px]">Try a question:</span>
+              {/* Topic Switcher */}
+              <div className="px-4 py-2.5 bg-white border-t border-slate-200/80 flex items-center gap-2 overflow-x-auto text-xs">
+                <span className="text-slate-600 shrink-0 font-semibold text-[11px]">Try:</span>
                 {['Calculus', 'Essay thesis', 'Physics', 'Chemistry'].map(t => (
                   <button
                     key={t}
                     onClick={() => handleSelectPreset(t)}
-                    className={`px-3 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
+                    className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
                       selectedTopic.toLowerCase() === t.toLowerCase()
-                        ? 'bg-[#F6C62B] text-slate-950 font-bold'
-                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                        ? 'bg-[#0F2249] text-white'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
                     {t}
@@ -380,54 +431,110 @@ export const Hero: React.FC<HeroProps> = ({ onOpenTrialModal, onBookExpert, isSu
                 ))}
               </div>
 
-              {/* Chat Input or Free Limit Lock Banner */}
+              {/* Input Bar */}
               {!hasReachedLimit ? (
-                <div className="p-3 bg-[#080f21] border-t border-slate-800">
+                <div className="p-3.5 bg-white border-t border-slate-200/80 space-y-2">
+                  {uploadError && (
+                    <div className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-[11px]">
+                      <span className="flex items-center gap-1.5">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span>{uploadError}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setUploadError(null)}
+                        className="cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+
+                  {attachedDocs.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {attachedDocs.map(doc => (
+                        <span
+                          key={doc.id}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-300 text-[#0F2249] text-[11px] font-medium"
+                        >
+                          <FileText className="w-3 h-3 shrink-0" />
+                          <span className="truncate max-w-[140px]">{doc.name}</span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setAttachedDocs(prev => prev.filter(d => d.id !== doc.id))
+                            }
+                            className="hover:text-rose-600 cursor-pointer"
+                            aria-label={`Remove ${doc.name}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
                   <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pdf,.txt,.md,.csv,.png,.jpg,.jpeg,.webp"
+                      multiple
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full transition-colors cursor-pointer shrink-0"
+                      title="Attach PDF, study notes, or homework photo"
+                      aria-label="Attach study file"
+                    >
+                      <Paperclip className="w-4 h-4" />
+                    </button>
                     <input
                       type="text"
                       value={inputVal}
                       onChange={e => setInputVal(e.target.value)}
-                      placeholder="Ask the AI anything about your homework…"
-                      className="flex-1 bg-[#122144] border border-slate-700 rounded-lg px-3.5 py-2.5 text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#F6C62B] transition-colors"
+                      placeholder="Ask a question or attach a study PDF…"
+                      className="flex-1 bg-[#F8FAFC] border border-slate-300 rounded-full px-4 py-2.5 text-xs sm:text-sm text-slate-950 placeholder-slate-500 focus:outline-none focus:border-[#0F2249] transition-colors"
                     />
                     <button
                       type="submit"
-                      disabled={!inputVal.trim() || isTyping}
-                      className="px-4 py-2.5 bg-[#F6C62B] hover:bg-[#ffd744] disabled:opacity-50 text-slate-950 font-bold text-xs rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                      disabled={(!inputVal.trim() && attachedDocs.length === 0) || isTyping}
+                      className="p-2.5 bg-[#0F2249] hover:bg-[#19346b] disabled:opacity-40 text-white rounded-full transition-colors flex items-center justify-center cursor-pointer"
+                      aria-label="Send message"
                     >
-                      <span>Send</span>
-                      <Send className="w-3.5 h-3.5" />
+                      <Send className="w-4 h-4" />
                     </button>
                   </form>
                   {questionsCount > 0 && (
-                    <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2 px-1">
-                      <span>Preview question {questionsCount} of {FREE_QUESTION_LIMIT}</span>
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 px-2">
+                      <span className="font-mono-nums">Preview {questionsCount}/{FREE_QUESTION_LIMIT} used</span>
                       <button
                         onClick={onOpenTrialModal}
-                        className="text-[#F6C62B] hover:underline cursor-pointer"
+                        className="text-[#0F2249] hover:underline cursor-pointer font-semibold"
                       >
-                        Unlock unlimited AI with trial →
+                        Unlock unlimited →
                       </button>
                     </div>
                   )}
                 </div>
               ) : (
-                /* Question Limit Reached: Conversion lock prompt */
-                <div className="p-4 bg-gradient-to-r from-[#0F2249] to-[#162a5b] border-t border-[#F6C62B]/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-2.5 text-slate-200">
-                    <div className="w-8 h-8 rounded-full bg-[#F6C62B]/20 text-[#F6C62B] flex items-center justify-center shrink-0">
+                <div className="p-4 bg-amber-50 border-t border-amber-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2.5 text-slate-700">
+                    <div className="w-8 h-8 rounded-full bg-amber-100 text-[#0F2249] flex items-center justify-center shrink-0">
                       <Lock className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="font-bold text-white text-xs">You've reached your free preview limit</div>
-                      <div className="text-[11px] text-slate-300">Start your free 3-day trial to continue asking unlimited questions.</div>
+                      <div className="font-bold text-slate-900 text-xs">Preview limit reached</div>
+                      <div className="text-[11px] text-slate-600">Start your 3-day free trial for unlimited AI tutoring.</div>
                     </div>
                   </div>
 
                   <button
                     onClick={onOpenTrialModal}
-                    className="w-full sm:w-auto px-4 py-2 bg-[#F6C62B] hover:bg-[#ffd744] text-slate-950 font-bold text-xs rounded-lg whitespace-nowrap shadow cursor-pointer transition-colors"
+                    className="w-full sm:w-auto px-4 py-2 bg-[#0F2249] hover:bg-[#19346b] text-white font-semibold text-xs rounded-full whitespace-nowrap cursor-pointer transition-colors"
                   >
                     Start Free Trial
                   </button>

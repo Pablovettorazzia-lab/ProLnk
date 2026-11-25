@@ -1,4 +1,4 @@
-import { Expert, ForumPost, DashboardSession, TeamMember, SurveyStat, FinancialYear } from '../types';
+import { Expert, ForumPost, DashboardSession, TeamMember } from '../types';
 import tutorDanielaImg from '../assets/images/tutor_daniela.jpg';
 import tutorMarcusImg from '../assets/images/tutor_marcus.jpg';
 
@@ -457,109 +457,35 @@ export const USER_PAST_SESSIONS: DashboardSession[] = [
 export const TEAM_MEMBERS: TeamMember[] = [
   {
     name: 'Juan Andrés Estrada',
-    role: 'Web Development and AI',
-    focus: 'Core Platform Architecture & AI Integration',
+    role: 'Co-Founder · AI & Platform Engineering',
+    focus: 'Core Architecture & Cited AI Engine',
     initials: 'JE',
     accentColor: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
-    bio: 'Responsible for full-stack platform development, AI API integration, algorithm matching, and continuous technical maintenance.'
+    bio: 'Leads full-stack platform architecture, AI curriculum grounding, tutor-matching systems, and cloud reliability.'
   },
   {
     name: 'Juan Andrés Díaz',
-    role: 'Marketing, Social Media & Finance',
-    focus: 'User Acquisition & Budget Planning',
+    role: 'Co-Founder · Growth & Finance',
+    focus: 'Student Acquisition & Financial Strategy',
     initials: 'JD',
     accentColor: 'bg-teal-500/20 text-teal-300 border-teal-500/40',
-    bio: 'Leads student outreach on Instagram and TikTok, influencer partnerships, and co-manages budget tracking and financial growth.'
+    bio: 'Oversees institutional partnerships, digital acquisition channels, pricing strategy, and financial operations.'
   },
   {
     name: 'Lourdes Monterroso',
-    role: 'Operations, Customer Support & Finance',
-    focus: 'Tutor Vetting & Financial Management',
+    role: 'Co-Founder · Academic Operations',
+    focus: 'Tutor Vetting & Quality Assurance',
     initials: 'LM',
     accentColor: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
-    bio: 'Oversees tutor credential onboarding, client support quality assurance, operational workflows, and accounting reports.'
+    bio: 'Directs instructor credential screening, pedagogical quality standards, student support, and operational workflows.'
   },
   {
     name: 'Pablo Vettorazzi',
-    role: 'Design and Web',
-    focus: 'Brand Identity & User Interface Experience',
+    role: 'Co-Founder · Product & Design',
+    focus: 'Brand Identity & Learning Experience',
     initials: 'PV',
     accentColor: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
-    bio: 'Lead visual and product designer. Crafted the official ProLnk brand, color harmony, typography hierarchy, and interactive prototypes.'
-  }
-];
-
-export const SURVEY_SUBJECTS: SurveyStat[] = [
-  { label: 'Physics', percentage: 35.0, count: 14, total: 40, color: 'bg-amber-400' },
-  { label: 'Mathematics', percentage: 35.0, count: 14, total: 40, color: 'bg-yellow-400' },
-  { label: 'Chemistry', percentage: 22.5, count: 9, total: 40, color: 'bg-emerald-400' },
-  { label: 'Social Studies', percentage: 20.0, count: 8, total: 40, color: 'bg-blue-400' },
-  { label: 'Literature', percentage: 17.5, count: 7, total: 40, color: 'bg-purple-400' },
-  { label: 'Biology', percentage: 12.5, count: 5, total: 40, color: 'bg-teal-400' },
-  { label: 'Entrepreneurship / Others', percentage: 2.5, count: 1, total: 40, color: 'bg-rose-400' }
-];
-
-export const SURVEY_AI_SITUATIONS: SurveyStat[] = [
-  { label: 'Quick midnight / last-minute needs', percentage: 57.5, count: 23, total: 40, color: 'bg-amber-400' },
-  { label: 'Urgent, live exam preparation', percentage: 37.5, count: 15, total: 40, color: 'bg-orange-400' },
-  { label: 'Grammar, essay, or text review', percentage: 32.5, count: 13, total: 40, color: 'bg-blue-400' },
-  { label: 'Step-by-step math or science', percentage: 25.0, count: 10, total: 40, color: 'bg-emerald-400' },
-  { label: 'Using AI first before human upgrade', percentage: 20.0, count: 8, total: 40, color: 'bg-purple-400' },
-  { label: '1-on-1 personalized tutoring', percentage: 12.5, count: 5, total: 40, color: 'bg-teal-400' },
-  { label: 'Career guidance / specialized', percentage: 7.5, count: 3, total: 40, color: 'bg-slate-400' }
-];
-
-export const SURVEY_TUTORING_FACTORS: SurveyStat[] = [
-  { label: 'Guaranteed grade improvement', percentage: 47.5, count: 19, total: 40, color: 'bg-amber-400' },
-  { label: 'Personalized attention', percentage: 45.0, count: 18, total: 40, color: 'bg-yellow-400' },
-  { label: 'Convenience & scheduling flexibility', percentage: 32.5, count: 13, total: 40, color: 'bg-blue-400' },
-  { label: 'Speed of help', percentage: 27.5, count: 11, total: 40, color: 'bg-teal-400' },
-  { label: 'Tutor credentials & degree', percentage: 25.0, count: 10, total: 40, color: 'bg-purple-400' },
-  { label: 'Free trial results / customized sessions', percentage: 20.0, count: 8, total: 40, color: 'bg-rose-400' }
-];
-
-export const SURVEY_PLATFORM_FEATURES: SurveyStat[] = [
-  { label: 'Community features (discussion & instructor access)', percentage: 47.5, count: 19, total: 40, color: 'bg-amber-400' },
-  { label: 'Instant Messaging', percentage: 40.0, count: 16, total: 40, color: 'bg-blue-400' },
-  { label: 'Seamless video calls', percentage: 30.0, count: 12, total: 40, color: 'bg-teal-400' },
-  { label: 'Tracking dashboards & session notes', percentage: 30.0, count: 12, total: 40, color: 'bg-purple-400' },
-  { label: 'Cross-device accessibility (mobile/desktop)', percentage: 30.0, count: 12, total: 40, color: 'bg-emerald-400' },
-  { label: 'Interactive Whiteboards', percentage: 27.5, count: 11, total: 40, color: 'bg-rose-400' },
-  { label: 'Offline accessibility', percentage: 25.0, count: 10, total: 40, color: 'bg-slate-400' }
-];
-
-export const FINANCIAL_GROWTH_DATA: FinancialYear[] = [
-  { year: '2018', income: 500, expenses: 650, profit: -150 },
-  { year: '2019', income: 800, expenses: 700, profit: 100 },
-  { year: '2020', income: 1000, expenses: 800, profit: 200 },
-  { year: '2021', income: 1400, expenses: 1000, profit: 400 },
-  { year: '2022', income: 2000, expenses: 1200, profit: 800 }
-];
-
-export const SEED_EXPENSES = [
-  {
-    category: 'Marketing & Advertising',
-    usd: 350,
-    quetzales: 2700,
-    percentage: 54,
-    description: 'Instagram & TikTok paid ads, physical promotional posters at Liceo Javier, and micro-influencer outreach.',
-    color: 'bg-blue-500'
-  },
-  {
-    category: 'Web Infrastructure & AI',
-    usd: 220,
-    quetzales: 1600,
-    percentage: 34,
-    description: 'Cloud hosting, database management, server operations, and AI API costs for 24/7 automated homework assistance.',
-    color: 'bg-teal-500'
-  },
-  {
-    category: 'Domain & Software Tools',
-    usd: 80,
-    quetzales: 600,
-    percentage: 12,
-    description: 'Custom domain registration (.com / .org / .app) and software/design tool licensing.',
-    color: 'bg-amber-500'
+    bio: 'Leads product strategy, design systems, interactive study workspaces, and end-to-end student experience.'
   }
 ];
 
@@ -568,63 +494,93 @@ export const AI_PRESET_QUESTIONS = [
     topic: 'Calculus',
     question: 'Why is the derivative of ln(x) equal to 1/x? I have an exam tomorrow.',
     answer: 'Start with y = ln(x), which means e^y = x.\nDifferentiate both sides with respect to x: d/dx(e^y) = d/dx(x).\nBy the chain rule, e^y · y′ = 1.\nSince e^y = x, substitute x back in: x · y′ = 1 ⇒ y′ = 1/x.\nTry it once yourself on ln(2x) using the chain rule to lock it in!',
-    source: 'OpenStax Calculus Volume 1, Section 3.9 (Implicit Differentiation)',
+    source: 'OpenStax Calculus Volume 1, Section 3.9',
+    sources: [
+      {
+        title: 'OpenStax Calculus Vol. 1 · Sec. 3.9 (Derivatives of Logs)',
+        uri: 'https://openstax.org/books/calculus-volume-1/pages/3-9-derivatives-of-exponential-and-logarithmic-functions',
+        type: 'textbook' as const
+      }
+    ],
     expertId: 'daniela-rios'
   },
   {
     topic: 'Physics',
     question: 'How do I know whether to use conservation of energy or conservation of momentum in collision problems?',
     answer: 'A clear rule of thumb:\n1. Total momentum is ALWAYS conserved in any closed system, whether elastic or inelastic, because internal forces cancel out by Newton\'s 3rd Law.\n2. Kinetic energy is ONLY conserved in purely ELASTIC collisions (where objects bounce without deforming or generating heat).\nIf objects stick together (inelastic), energy is lost to heat/deformation—use momentum to solve for velocity!',
-    source: 'Giancoli Physics: Principles with Applications (7th Ed), Chapter 7.4',
+    source: 'OpenStax University Physics Volume 1, Section 9.4',
+    sources: [
+      {
+        title: 'OpenStax University Physics Vol. 1 · Sec. 9.4 (Types of Collisions)',
+        uri: 'https://openstax.org/books/university-physics-volume-1/pages/9-4-types-of-collisions',
+        type: 'textbook' as const
+      }
+    ],
     expertId: 'andres-molina'
   },
   {
     topic: 'Chemistry',
     question: 'How do I balance redox reactions in acidic solution without guessing?',
     answer: 'Follow the 5-step ion-electron method:\n1. Write separate oxidation and reduction half-reactions.\n2. Balance all atoms EXCEPT oxygen and hydrogen.\n3. Balance O atoms by adding H2O to the side deficient in oxygen.\n4. Balance H atoms by adding H+ to the opposite side.\n5. Balance total electric charges by adding electrons (e-).\nFinally, multiply half-reactions by integers so electrons cancel, then add them together.',
-    source: 'Atkins & Jones, Chemical Principles (6th Ed), Section 12.2',
+    source: 'OpenStax Chemistry 2e, Section 4.2',
+    sources: [
+      {
+        title: 'OpenStax Chemistry 2e · Sec. 4.2 (Classifying Chemical Reactions)',
+        uri: 'https://openstax.org/books/chemistry-2e/pages/4-2-classifying-chemical-reactions',
+        type: 'textbook' as const
+      }
+    ],
     expertId: 'marcus-bell'
   },
   {
     topic: 'Essay thesis',
     question: 'What makes a strong thesis statement for an argumentative essay on artificial intelligence?',
     answer: 'A strong thesis must be debatable, specific, and provide a "roadmap".\n❌ Weak: "Artificial intelligence has pros and cons for students." (Stating the obvious)\n✅ Strong: "Although automated AI study tools provide vital immediate feedback for high school students during late-night study hours, educational institutions must pair them with verified human tutoring to safeguard critical thinking and prevent conceptual over-reliance."\nNotice the structure: Counter-argument + Core claim + "Because" rationale.',
-    source: 'The Craft of Research (4th Ed), Chapter 9: Assembling Arguments',
+    source: 'Purdue OWL · Tips and Examples for Writing Thesis Statements',
+    sources: [
+      {
+        title: 'Purdue OWL · Writing Thesis Statements',
+        uri: 'https://owl.purdue.edu/owl/general_writing/the_writing_process/thesis_statement_tips.html',
+        type: 'textbook' as const
+      }
+    ],
     expertId: 'priya-nair'
   },
   {
     topic: 'Biology',
     question: 'What is the main difference between active transport and facilitated diffusion?',
     answer: '1. Direction & Energy: Facilitated diffusion moves substances DOWN their concentration gradient (high to low) with NO ATP expenditure.\n2. Active transport pumps substances AGAINST their concentration gradient (low to high), requiring direct or indirect ATP consumption.\n3. Both use transmembrane proteins, but only active transport can establish steep chemical gradients like the Na+/K+ ATPase pump.',
-    source: 'Campbell Biology (12th Ed), Chapter 7: Membrane Structure and Function',
+    source: 'OpenStax Biology 2e, Section 5.3',
+    sources: [
+      {
+        title: 'OpenStax Biology 2e · Sec. 5.3 (Active Transport)',
+        uri: 'https://openstax.org/books/biology-2e/pages/5-3-active-transport',
+        type: 'textbook' as const
+      }
+    ],
     expertId: 'marcus-bell'
   }
 ];
 
 export const HISTORY_TIMELINE = [
   {
-    year: '2018',
-    title: 'The Challenge Recognized',
-    description: 'Students in Guatemala recognized how difficult and isolating it was to find fast, reliable academic help late at night before big exam dates.'
+    year: '2024 · Q1',
+    title: 'Identifying the Verification Gap',
+    description: 'Launched ProLnk to solve student frustration with unverified generic AI outputs and limited access to live instructors during critical exam windows.'
   },
   {
-    year: '2019',
-    title: 'Peer-to-Peer Network',
-    description: 'Launched an initial peer-to-peer network connecting college students with vetted expert tutors for urgent homework and test preparation.'
+    year: '2024 · Q3',
+    title: 'Vetted Instructor Network',
+    description: 'Established a structured academic vetting pipeline onboarding specialists in Physics, Calculus, Chemistry, Writing, and Software Engineering.'
   },
   {
-    year: '2020',
-    title: 'AI Automation Integration',
-    description: 'Integrated smart AI-powered assistance to provide instant, 24/7 answers with verified sources alongside human tutor assistance.'
+    year: '2025',
+    title: 'Cited AI & Hybrid Study Workspace',
+    description: 'Introduced textbook-grounded AI explanations paired with live collaborative whiteboards and persistent session notebooks.'
   },
   {
-    year: '2021',
-    title: 'Official Platform Launch',
-    description: 'Officially launched the unified web platform, seamlessly combining 24/7 instant AI responses with verified 1-on-1 expert support.'
-  },
-  {
-    year: '2022',
-    title: 'Rebranded as ProLnk',
-    description: 'Rebranded as ProLnk (Smart. Expert. Fast.) and expanded services to high school students, college learners, and young professionals.'
+    year: '2026',
+    title: 'Unified ProLnk Academic Portal',
+    description: 'Scaled into a full-featured learning platform combining 24/7 AI tutoring, community Q&A, progress analytics, and on-demand 1-on-1 mentorship.'
   }
 ];

@@ -11,7 +11,6 @@ import { HowItWorks } from './components/HowItWorks';
 import { MarketResearch } from './components/MarketResearch';
 import { ExpertDirectory } from './components/ExpertDirectory';
 import { CommunityAndDashboard } from './components/CommunityAndDashboard';
-import { ComparisonTable } from './components/ComparisonTable';
 import { PricingSection } from './components/PricingSection';
 import { AboutAndTeam } from './components/AboutAndTeam';
 import { FAQ } from './components/FAQ';
@@ -20,10 +19,12 @@ import { Footer } from './components/Footer';
 import { Dashboard } from './components/Dashboard';
 import { ProfilePage } from './components/ProfilePage';
 import { BookingModal, TrialModal, LoginModal, QuestionModal, ContactModal } from './components/Modals';
-import { Expert, ForumPost, DashboardSession } from './types';
+import { ChatbotWidget } from './components/ChatbotWidget';
+import { Expert, ForumPost, DashboardSession, PublicPage } from './types';
 import { EXPERTS_DATA, USER_PAST_SESSIONS, FORUM_POSTS } from './data/mockData';
-import { CheckCircle2, X, LayoutDashboard } from 'lucide-react';
+import { CheckCircle2, X } from 'lucide-react';
 import { onAuthStatusChange, logoutUser } from './firebase/authService';
+import { auth } from './firebase/config';
 import {
   saveUserProfile,
   getUserProfile,
@@ -49,12 +50,79 @@ export interface AuthUser {
   learningGoal?: string;
   streakDays?: number;
   xpPoints?: number;
+  isDemo?: boolean;
 }
 
 export default function App() {
+  // Global Theme state (Light Ivory Studio default, toggleable to Dark Mode)
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('prolnk_theme') === 'dark';
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('theme-dark', isDarkMode);
+    try {
+      localStorage.setItem('prolnk_theme', isDarkMode ? 'dark' : 'light');
+    } catch {}
+  }, [isDarkMode]);
+
+  const toggleDarkMode = () => setIsDarkMode(prev => !prev);
+
   // Authentication & View state
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [currentView, setCurrentView] = useState<'landing' | 'dashboard' | 'profile'>('landing');
+
+  // Multi-page public routing synced with URL hash
+  const parsePageFromHash = (): PublicPage => {
+    const hash = window.location.hash.replace(/^#\/?/, '').toLowerCase();
+    if (hash === 'how' || hash === 'how-it-works' || hash === 'faq' || hash === 'privacy') return 'how';
+    if (hash === 'experts') return 'experts';
+    if (hash === 'community') return 'community';
+    if (hash === 'pricing') return 'pricing';
+    if (hash === 'about' || hash === 'team') return 'about';
+    return 'home';
+  };
+
+  const [activePage, setActivePage] = useState<PublicPage>(() => parsePageFromHash());
+
+  useEffect(() => {
+    const onHashChange = () => {
+      setActivePage(parsePageFromHash());
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  const navigateToPage = (page: PublicPage, sectionId?: string) => {
+    setActivePage(page);
+    const hashMap: Record<PublicPage, string> = {
+      home: '#/',
+      how: '#/how-it-works',
+      experts: '#/experts',
+      community: '#/community',
+      pricing: '#/pricing',
+      about: '#/about'
+    };
+    if (window.location.hash !== hashMap[page]) {
+      window.history.pushState(null, '', hashMap[page]);
+    }
+    if (sectionId) {
+      setTimeout(() => {
+        const el = document.getElementById(sectionId);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth' });
+        } else {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }, 60);
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   // Firestore persistent state
   const [userSessions, setUserSessions] = useState<DashboardSession[]>(USER_PAST_SESSIONS);
@@ -62,6 +130,7 @@ export default function App() {
 
   // Modals state
   const [trialModalOpen, setTrialModalOpen] = useState(false);
+  const [trialInitialEmail, setTrialInitialEmail] = useState('');
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [questionModalOpen, setQuestionModalOpen] = useState(false);
@@ -69,8 +138,30 @@ export default function App() {
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const [selectedExpert, setSelectedExpert] = useState<Expert | null>(null);
 
-  // Global toast notification
+  // Global toast notification & fatal Firestore permission error state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [fatalError, setFatalError] = useState<Error | null>(null);
+
+  if (fatalError) {
+    throw fatalError;
+  }
+
+  const handleServiceError = (err: unknown) => {
+    if (err instanceof Error) {
+      try {
+        const parsed = JSON.parse(err.message);
+        if (parsed && typeof parsed.operationType === 'string' && typeof parsed.error === 'string') {
+          if (parsed.error.toLowerCase().includes('permission') || parsed.error.toLowerCase().includes('insufficient')) {
+            setFatalError(err);
+            return;
+          }
+        }
+      } catch {
+        // non-JSON error
+      }
+    }
+    console.warn('Firestore operation notice:', err);
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -82,13 +173,15 @@ export default function App() {
   // Sync with Firebase Auth and Firestore on mount
   useEffect(() => {
     // 1. Fetch community posts from Firestore
-    getForumPosts().then(posts => {
-      if (posts && posts.length > 0) {
-        setCommunityPosts(posts);
-      }
-    }).catch(err => console.warn('Could not fetch Firestore forum posts:', err));
+    getForumPosts()
+      .then(posts => {
+        if (posts && posts.length > 0) {
+          setCommunityPosts(posts);
+        }
+      })
+      .catch(err => handleServiceError(err));
 
-    // 2. Listen to Firebase Auth state
+    // 2. Listen to Firebase Auth state (no unauthenticated localStorage bypass)
     const unsubscribe = onAuthStatusChange(async (firebaseUser) => {
       if (firebaseUser) {
         try {
@@ -100,14 +193,14 @@ export default function App() {
             photoURL: profile?.photoURL || firebaseUser.photoURL || undefined,
             plan: profile?.plan || '3-Day Free Trial',
             daysLeft: 3,
-            bio: profile?.bio || 'Estudiante universitario enfocado en dominar cálculo y física con apoyo de ProLnk.',
+            bio: profile?.bio || 'University student focused on mastering calculus and physics with ProLnk.',
             university: profile?.university || 'Universidad del Valle de Guatemala',
-            major: profile?.major || 'Ingeniería en Ciencias de la Computación',
-            semester: profile?.semester || '4to Semestre',
-            targetSubjects: profile?.targetSubjects || ['Cálculo Diferencial', 'Física II', 'Álgebra Lineal'],
-            learningGoal: profile?.learningGoal || 'Obtener nota superior a 90 en los exámenes parciales y dominar cálculo multivariable.',
-            streakDays: profile?.streakDays || 5,
-            xpPoints: profile?.xpPoints || 840
+            major: profile?.major || 'Computer Science & Engineering',
+            semester: profile?.semester || '4th Semester',
+            targetSubjects: profile?.targetSubjects || ['Differential Calculus', 'Physics II', 'Linear Algebra'],
+            learningGoal: profile?.learningGoal || 'Maintain a GPA above 90 and master multivariable calculus.',
+            streakDays: profile?.streakDays ?? 5,
+            xpPoints: profile?.xpPoints ?? 840
           };
           setCurrentUser(user);
 
@@ -117,15 +210,13 @@ export default function App() {
             setUserSessions(sessions);
           }
         } catch (e) {
-          console.error('Error loading Firestore user data:', e);
+          handleServiceError(e);
         }
       } else {
-        // Fallback to localStorage if any
+        setCurrentUser(prev => (prev?.isDemo ? prev : null));
+        setUserSessions(USER_PAST_SESSIONS);
         try {
-          const stored = localStorage.getItem('prolnk_user');
-          if (stored) {
-            setCurrentUser(JSON.parse(stored));
-          }
+          localStorage.removeItem('prolnk_user');
         } catch {}
       }
     });
@@ -134,9 +225,14 @@ export default function App() {
   }, []);
 
   const handleRegisterUser = async (name: string, email: string, uid?: string, photoURL?: string) => {
-    const userUid = uid || `user_${Date.now()}`;
+    const activeUid = uid || auth.currentUser?.uid;
+    if (!activeUid) {
+      showToast('Please complete Firebase sign-up to activate your account.');
+      return;
+    }
+
     const newUser: AuthUser = {
-      uid: userUid,
+      uid: activeUid,
       name: name || 'Student',
       email: email,
       photoURL,
@@ -145,29 +241,34 @@ export default function App() {
     };
     setCurrentUser(newUser);
 
-    try {
-      localStorage.setItem('prolnk_user', JSON.stringify(newUser));
-    } catch {}
-
     // Persist to Firestore
-    await saveUserProfile({
-      id: userUid,
-      name: newUser.name,
-      email: newUser.email,
-      photoURL,
-      plan: newUser.plan,
-      role: 'student',
-      createdAt: new Date().toISOString()
-    });
-    
+    try {
+      await saveUserProfile({
+        id: activeUid,
+        name: newUser.name,
+        email: newUser.email,
+        photoURL,
+        plan: newUser.plan,
+        role: 'student',
+        createdAt: new Date().toISOString()
+      });
+    } catch (err) {
+      handleServiceError(err);
+    }
+
     setCurrentView('dashboard');
     showToast(`Account created! Welcome to your ProLnk Dashboard, ${newUser.name}.`);
   };
 
   const handleLoginUser = async (name: string, email: string, uid?: string, photoURL?: string) => {
-    const userUid = uid || `user_${Date.now()}`;
+    const activeUid = uid || auth.currentUser?.uid;
+    if (!activeUid) {
+      showToast('Please sign in with your Firebase account credentials.');
+      return;
+    }
+
     const user: AuthUser = {
-      uid: userUid,
+      uid: activeUid,
       name: name || 'Pablo Vettorazzi',
       email: email,
       photoURL,
@@ -176,31 +277,58 @@ export default function App() {
     };
     setCurrentUser(user);
 
-    try {
-      localStorage.setItem('prolnk_user', JSON.stringify(user));
-    } catch {}
-
     // Persist / update to Firestore
-    await saveUserProfile({
-      id: userUid,
-      name: user.name,
-      email: user.email,
-      photoURL,
-      plan: user.plan,
-      role: 'student',
-      createdAt: new Date().toISOString()
-    });
+    try {
+      await saveUserProfile({
+        id: activeUid,
+        name: user.name,
+        email: user.email,
+        photoURL,
+        plan: user.plan,
+        role: 'student',
+        createdAt: new Date().toISOString()
+      });
+    } catch (err) {
+      handleServiceError(err);
+    }
 
     // Load sessions from Firestore
     try {
-      const sessions = await getUserSessions(userUid);
+      const sessions = await getUserSessions(activeUid);
       if (sessions && sessions.length > 0) {
         setUserSessions(sessions);
       }
-    } catch {}
+    } catch (err) {
+      handleServiceError(err);
+    }
 
     setCurrentView('dashboard');
     showToast(`Welcome back, ${user.name}!`);
+  };
+
+  const handleEnterDemoPortal = () => {
+    const demoUser: AuthUser = {
+      uid: 'demo-student-pablo',
+      name: 'Pablo Vettorazzi',
+      email: 'Pablovettorazzia@hotmail.com',
+      plan: 'Study Pass (Demo)',
+      daysLeft: 14,
+      bio: 'University student focused on mastering multivariable calculus, physics, and computer science on ProLnk.',
+      university: 'Universidad del Valle de Guatemala',
+      major: 'Computer Science & Engineering',
+      semester: '4th Semester',
+      targetSubjects: ['Multivariable Calculus', 'Physics II', 'Linear Algebra'],
+      learningGoal: 'Master integration techniques and maintain a GPA above 90.',
+      streakDays: 12,
+      xpPoints: 1420,
+      isDemo: true
+    };
+    setCurrentUser(demoUser);
+    setUserSessions(USER_PAST_SESSIONS);
+    setLoginModalOpen(false);
+    setTrialModalOpen(false);
+    setCurrentView('dashboard');
+    showToast('Entered Demo Portal as Pablo Vettorazzi. All features unlocked!');
   };
 
   const handleLogOut = async () => {
@@ -237,8 +365,12 @@ export default function App() {
 
     setUserSessions(prev => [newSession, ...prev]);
 
-    if (currentUser?.uid) {
-      await saveUserSession(currentUser.uid, newSession);
+    if (currentUser?.uid && auth.currentUser?.uid === currentUser.uid) {
+      try {
+        await saveUserSession(currentUser.uid, newSession);
+      } catch (err) {
+        handleServiceError(err);
+      }
     }
 
     showToast(`Session booked with ${details.expertName} for Q${details.total}! Check your email for room link.`);
@@ -269,20 +401,26 @@ export default function App() {
 
     setCommunityPosts(prev => [newPost, ...prev]);
 
-    const uid = currentUser?.uid || 'guest';
-    await createForumPost(newPost, uid);
-
-    showToast(`Your question "${title.substring(0, 30)}..." in ${category} was posted to the community!`);
+    if (currentUser?.uid && auth.currentUser?.uid === currentUser.uid) {
+      try {
+        await createForumPost(newPost, currentUser.uid);
+        showToast(`Your question "${title.substring(0, 30)}..." in ${category} was posted to the community!`);
+      } catch (err) {
+        handleServiceError(err);
+      }
+    } else {
+      showToast('Preview posted locally! Sign up or log in to publish your question permanently.');
+    }
   };
 
   const handleVoteQuestion = async (postId: string) => {
-    let targetVotes = 0;
+    let voteDelta: 1 | -1 | null = null;
     setCommunityPosts(prev =>
       prev.map(p => {
         if (p.id === postId) {
           const hasVoted = p.userVoted;
-          const nextVotes = hasVoted ? p.votes - 1 : p.votes + 1;
-          targetVotes = nextVotes;
+          voteDelta = hasVoted ? -1 : 1;
+          const nextVotes = Math.max(0, p.votes + voteDelta);
           return {
             ...p,
             votes: nextVotes,
@@ -293,42 +431,47 @@ export default function App() {
       })
     );
 
-    if (targetVotes > 0) {
-      await updatePostVotes(postId, targetVotes);
+    if (voteDelta !== null && currentUser?.uid && auth.currentUser) {
+      try {
+        await updatePostVotes(postId, voteDelta);
+      } catch (err) {
+        handleServiceError(err);
+      }
     }
   };
 
   const scrollToExperts = () => {
-    const el = document.getElementById('experts');
-    if (el) el.scrollIntoView({ behavior: 'smooth' });
+    navigateToPage('experts');
   };
 
   const handleUpdateProfile = async (updatedData: Partial<AuthUser>) => {
     if (!currentUser) return;
     const updated: AuthUser = { ...currentUser, ...updatedData };
     setCurrentUser(updated);
-    try {
-      localStorage.setItem('prolnk_user', JSON.stringify(updated));
-    } catch {}
 
-    if (currentUser.uid) {
-      await saveUserProfile({
-        id: currentUser.uid,
-        name: updated.name,
-        email: updated.email,
-        photoURL: updated.photoURL,
-        plan: updated.plan,
-        role: 'student',
-        createdAt: new Date().toISOString(),
-        bio: updated.bio,
-        university: updated.university,
-        major: updated.major,
-        semester: updated.semester,
-        targetSubjects: updated.targetSubjects,
-        learningGoal: updated.learningGoal,
-        streakDays: updated.streakDays,
-        xpPoints: updated.xpPoints
-      });
+    if (currentUser.uid && auth.currentUser?.uid === currentUser.uid) {
+      try {
+        await saveUserProfile({
+          id: currentUser.uid,
+          name: updated.name,
+          email: updated.email,
+          photoURL: updated.photoURL,
+          plan: updated.plan,
+          role: 'student',
+          createdAt: new Date().toISOString(),
+          bio: updated.bio,
+          university: updated.university,
+          major: updated.major,
+          semester: updated.semester,
+          targetSubjects: updated.targetSubjects,
+          learningGoal: updated.learningGoal,
+          streakDays: updated.streakDays,
+          xpPoints: updated.xpPoints
+        });
+      } catch (err) {
+        handleServiceError(err);
+        return;
+      }
     }
     showToast('Your profile has been updated successfully!');
   };
@@ -338,10 +481,13 @@ export default function App() {
     return (
       <ProfilePage
         user={currentUser}
+        sessionsCount={userSessions.length}
         onBackToDashboard={() => setCurrentView('dashboard')}
         onViewLandingPage={() => {}}
         onLogOut={handleLogOut}
         onUpdateProfile={handleUpdateProfile}
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={toggleDarkMode}
       />
     );
   }
@@ -361,6 +507,8 @@ export default function App() {
           onBookExpert={handleBookExpert}
           onUpdateProfile={handleUpdateProfile}
           onOpenProfile={() => setCurrentView('profile')}
+          isDarkMode={isDarkMode}
+          onToggleDarkMode={toggleDarkMode}
         />
 
         {/* Modals in dashboard */}
@@ -371,16 +519,26 @@ export default function App() {
           onBookingConfirmed={handleBookingConfirmed}
         />
 
+        {/* 24/7 AI Tutor Chatbot - Active & Open in Dashboard with Unlimited Questions */}
+        <ChatbotWidget
+          isSubscribed={true}
+          onOpenTrialModal={() => {}}
+          onBookExpert={handleBookExpert}
+          onOpenQuestionModal={() => setQuestionModalOpen(true)}
+          studentName={currentUser.name}
+          initiallyOpen={true}
+        />
+
         {/* Global Toast */}
         {toastMessage && (
-          <div className="fixed bottom-6 right-6 z-50 max-w-md bg-[#0F2249] text-white border-2 border-[#F6C62B] p-4 rounded-xl shadow-2xl flex items-start gap-3 animate-in slide-in-from-bottom-5 duration-200">
-            <CheckCircle2 className="w-5 h-5 text-[#F6C62B] shrink-0 mt-0.5" />
+          <div className="fixed bottom-6 right-6 z-50 max-w-md bg-[#0F2249] text-white border border-slate-700/60 p-4 rounded-2xl shadow-2xl flex items-start gap-3 animate-in slide-in-from-bottom-5 duration-200">
+            <CheckCircle2 className="w-5 h-5 text-[#F5C542] shrink-0 mt-0.5" />
             <div className="flex-1 text-xs sm:text-sm font-medium leading-snug">
               {toastMessage}
             </div>
             <button
               onClick={() => setToastMessage(null)}
-              className="text-slate-400 hover:text-white cursor-pointer"
+              className="text-slate-300 hover:text-white cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -392,71 +550,130 @@ export default function App() {
 
   // Otherwise, render Public Landing Page
   return (
-    <div className="min-h-screen bg-[#080f21] text-slate-100 flex flex-col font-sans selection:bg-[#F6C62B]/30 selection:text-white">
+    <div className="min-h-screen bg-[#FAFAF7] text-slate-900 flex flex-col font-sans selection:bg-[#F5C542]/40 selection:text-slate-950">
       
       {/* Top Header */}
       <Header
         onOpenTrialModal={() => setTrialModalOpen(true)}
         onOpenLoginModal={() => setLoginModalOpen(true)}
+        onEnterDemo={handleEnterDemoPortal}
         currentUser={currentUser}
         onGoToDashboard={() => setCurrentView('dashboard')}
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={toggleDarkMode}
+        activePage={activePage}
+        onNavigate={(page) => navigateToPage(page)}
       />
 
-      {/* Main Content Sections */}
+      {/* Main Content Pages (Cleanly Separated) */}
       <main className="flex-1">
-        {/* Hero Section with Live Fast AI Chat */}
-        <Hero
-          onOpenTrialModal={() => setTrialModalOpen(true)}
-          onBookExpert={handleBookExpert}
-          isSubscribed={!!currentUser}
-        />
+        {activePage === 'home' && (
+          <>
+            <Hero
+              onOpenTrialModal={() => setTrialModalOpen(true)}
+              onBookExpert={handleBookExpert}
+              onEnterDemo={handleEnterDemoPortal}
+              isSubscribed={!!currentUser}
+            />
 
-        {/* Speed Ladder */}
-        <SpeedLadder
-          onOpenTrialModal={() => setTrialModalOpen(true)}
-          onExploreExperts={scrollToExperts}
-        />
+            <SpeedLadder
+              onOpenTrialModal={() => setTrialModalOpen(true)}
+              onExploreExperts={scrollToExperts}
+              onBrowseCommunity={() => navigateToPage('community')}
+            />
 
-        {/* How It Works (4 Steps) */}
-        <HowItWorks />
+            <MarketResearch />
 
-        {/* Market Research (40 students surveyed, 4 stats, 3 charts) */}
-        <MarketResearch />
+            <CtaBanner
+              onSuccessSubmit={(email) => {
+                setTrialInitialEmail(email);
+                setTrialModalOpen(true);
+              }}
+              onViewPrivacy={() => navigateToPage('how', 'privacy')}
+            />
+          </>
+        )}
 
-        {/* Verified Experts Directory with Flippable Cards */}
-        <ExpertDirectory onBookExpert={handleBookExpert} />
+        {activePage === 'how' && (
+          <>
+            <HowItWorks />
+            <FAQ />
+            <CtaBanner
+              onSuccessSubmit={(email) => {
+                setTrialInitialEmail(email);
+                setTrialModalOpen(true);
+              }}
+              onViewPrivacy={() => navigateToPage('how', 'privacy')}
+            />
+          </>
+        )}
 
-        {/* Community Forum & Student Dashboard Preview */}
-        <CommunityAndDashboard
-          onBookExpert={handleBookExpert}
-          onOpenQuestionModal={() => setQuestionModalOpen(true)}
-          posts={communityPosts}
-          onVotePost={handleVoteQuestion}
-        />
+        {activePage === 'experts' && (
+          <>
+            <ExpertDirectory
+              onBookExpert={handleBookExpert}
+              defaultShowAll={true}
+            />
+            <CtaBanner
+              onSuccessSubmit={(email) => {
+                setTrialInitialEmail(email);
+                setTrialModalOpen(true);
+              }}
+              onViewPrivacy={() => navigateToPage('how', 'privacy')}
+            />
+          </>
+        )}
 
-        {/* Competitor Comparison Matrix (ProLnk vs Chegg, Course Hero, Brainly) */}
-        <ComparisonTable />
+        {activePage === 'community' && (
+          <>
+            <CommunityAndDashboard
+              onBookExpert={handleBookExpert}
+              onOpenQuestionModal={() => setQuestionModalOpen(true)}
+              posts={communityPosts}
+              onVotePost={handleVoteQuestion}
+              defaultShowAll={true}
+            />
+            <CtaBanner
+              onSuccessSubmit={(email) => {
+                setTrialInitialEmail(email);
+                setTrialModalOpen(true);
+              }}
+              onViewPrivacy={() => navigateToPage('how', 'privacy')}
+            />
+          </>
+        )}
 
-        {/* Pricing, Real-time Calculator & 3-Step Recommendation Quiz */}
-        <PricingSection
-          onOpenTrialModal={() => setTrialModalOpen(true)}
-          onSelectPlan={handleSelectPlan}
-        />
+        {activePage === 'pricing' && (
+          <>
+            <PricingSection
+              onOpenTrialModal={() => setTrialModalOpen(true)}
+              onSelectPlan={handleSelectPlan}
+            />
+            <FAQ />
+          </>
+        )}
 
-        {/* About ProLnk, Mission, Vision, Values, History & Team */}
-        <AboutAndTeam />
-
-        {/* 3-Day Free Trial Banner (Start your free 3 day trial) */}
-        <CtaBanner onSuccessSubmit={(email) => handleRegisterUser(email.split('@')[0], email)} />
-
-        {/* FAQ (Questions students ask us) & Privacy/Terms */}
-        <FAQ />
+        {activePage === 'about' && (
+          <>
+            <AboutAndTeam />
+            <MarketResearch />
+            <CtaBanner
+              onSuccessSubmit={(email) => {
+                setTrialInitialEmail(email);
+                setTrialModalOpen(true);
+              }}
+              onViewPrivacy={() => navigateToPage('how', 'privacy')}
+            />
+          </>
+        )}
       </main>
 
       {/* Footer */}
       <Footer
         onOpenTrialModal={() => setTrialModalOpen(true)}
         onOpenContactModal={() => setContactModalOpen(true)}
+        isDarkMode={isDarkMode}
+        onNavigate={navigateToPage}
       />
 
       {/* Interactive Modals */}
@@ -469,7 +686,11 @@ export default function App() {
 
       <TrialModal
         isOpen={trialModalOpen}
-        onClose={() => setTrialModalOpen(false)}
+        initialEmail={trialInitialEmail}
+        onClose={() => {
+          setTrialModalOpen(false);
+          setTrialInitialEmail('');
+        }}
         onRegister={handleRegisterUser}
       />
 
@@ -477,6 +698,7 @@ export default function App() {
         isOpen={loginModalOpen}
         onClose={() => setLoginModalOpen(false)}
         onLogin={handleLoginUser}
+        onEnterDemo={handleEnterDemoPortal}
       />
 
       <QuestionModal
@@ -490,16 +712,27 @@ export default function App() {
         onClose={() => setContactModalOpen(false)}
       />
 
+      {/* Floating 24/7 AI Tutor Chatbot - 3 Free Questions Limit on Public Pages */}
+      <ChatbotWidget
+        isSubscribed={false}
+        onOpenTrialModal={() => setTrialModalOpen(true)}
+        onOpenLoginModal={() => setLoginModalOpen(true)}
+        onBookExpert={handleBookExpert}
+        onOpenQuestionModal={() => setQuestionModalOpen(true)}
+        onNavigatePage={(page) => navigateToPage(page)}
+        initiallyOpen={false}
+      />
+
       {/* Floating Global Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 max-w-md bg-[#0F2249] text-white border-2 border-[#F6C62B] p-4 rounded-xl shadow-2xl flex items-start gap-3 animate-in slide-in-from-bottom-5 duration-200">
-          <CheckCircle2 className="w-5 h-5 text-[#F6C62B] shrink-0 mt-0.5" />
+        <div className="fixed bottom-6 right-6 z-50 max-w-md bg-[#0F2249] text-white border border-slate-700/60 p-4 rounded-2xl shadow-2xl flex items-start gap-3 animate-in slide-in-from-bottom-5 duration-200">
+          <CheckCircle2 className="w-5 h-5 text-[#F5C542] shrink-0 mt-0.5" />
           <div className="flex-1 text-xs sm:text-sm font-medium leading-snug">
             {toastMessage}
           </div>
           <button
             onClick={() => setToastMessage(null)}
-            className="text-slate-400 hover:text-white cursor-pointer"
+            className="text-slate-300 hover:text-white cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>

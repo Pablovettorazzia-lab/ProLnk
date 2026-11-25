@@ -3,33 +3,41 @@
 @layer base {
   :root {
     --logo-navy: #0F2249;
-    --logo-yellow: #F6C62B;
-    --navy-dark: #070e1e;
-    --navy-card: #0d1833;
-    --navy-border: #1e2e5c;
+    --logo-yellow: #F5B800;
+    --ivory-canvas: #FAFAF7;
+    --ivory-muted: #F3F1EC;
+    --ink-primary: #0F172A;
+    --ink-secondary: #334155;
   }
 
   body {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-    background-color: #080f21;
-    color: #f1f5f9;
+    background-color: #FAFAF7;
+    color: #0F172A;
     transition: background-color 0.2s ease, color 0.2s ease;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    letter-spacing: -0.025em;
   }
 }
 
 .font-display {
-  font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+}
+
+.font-serif-accent {
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
 }
 
 .font-hero-headline {
-  font-family: 'Inter', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   font-weight: 800;
-  letter-spacing: -0.04em;
-  line-height: 1.04;
+  letter-spacing: -0.035em;
+  line-height: 1.06;
 }
 
 .font-mono-nums {
@@ -37,200 +45,537 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Custom scrollbars */
+/* Soft clean scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 ::-webkit-scrollbar-track {
-  background: #080f21;
+  background: #F3F1EC;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1e2e5c;
-  border-radius: 4px;
+  background: #CBD5E1;
+  border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #2a4185;
+  background: #94A3B8;
 }
 
-/* Glass card styling */
-.glass-panel {
-  background: rgba(13, 24, 51, 0.75);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+/* Luminous floating card surface with crisp border contrast */
+.studio-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(15, 23, 42, 0.13);
+  box-shadow: 0 10px 30px -12px rgba(15, 34, 73, 0.10);
 }
 
-.glass-panel-hover {
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+.studio-card-hover {
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.glass-panel-hover:hover {
-  background: rgba(18, 33, 70, 0.85);
-  border-color: rgba(246, 198, 43, 0.35);
+.studio-card-hover:hover {
   transform: translateY(-2px);
+  border-color: rgba(15, 34, 73, 0.28);
+  box-shadow: 0 18px 40px -14px rgba(15, 34, 73, 0.16);
 }
 
 /* ========================================================
-   LIGHT THEME ADAPTATION (html.theme-light)
-   Crisp, high-contrast, modern clean academic aesthetic
+   GLOBAL DARK MODE (.theme-dark on <html>)
+   Clean, serene midnight-navy studio theme with high contrast
    ======================================================== */
-html.theme-light body {
-  background-color: #f8fafc !important;
-  color: #0f172a !important;
+html.theme-dark body {
+  background-color: #070D1B;
+  color: #F1F5F9;
 }
 
-/* Top header & navigation */
-html.theme-light header {
-  background-color: rgba(255, 255, 255, 0.95) !important;
-  border-color: #e2e8f0 !important;
+html.theme-dark ::-webkit-scrollbar-track {
+  background: #0B1326;
+}
+html.theme-dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+html.theme-dark ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
 }
 
-html.theme-light .bg-\[\#0c1938\] {
-  background-color: #f1f5f9 !important;
-  border-color: #e2e8f0 !important;
+/* Base ivory/light backgrounds -> deep midnight surfaces */
+html.theme-dark .bg-\[\#FAFAF7\],
+html.theme-dark .bg-\[\#FAFAF7\]\/85,
+html.theme-dark .bg-\[\#FAFAF7\]\/90,
+html.theme-dark .bg-\[\#FCFBF9\] {
+  background-color: #070D1B !important;
 }
 
-/* Section backgrounds */
-html.theme-light section {
-  border-color: #e2e8f0 !important;
+html.theme-dark header.bg-\[\#FAFAF7\]\/90 {
+  background-color: rgba(7, 13, 27, 0.88) !important;
 }
 
-html.theme-light footer {
-  background-color: #f1f5f9 !important;
-  border-color: #e2e8f0 !important;
+html.theme-dark .bg-\[\#F3F1EC\] {
+  background-color: #050914 !important;
 }
 
-/* Dashboard Sidebar & Main Header */
-html.theme-light aside {
-  background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
+html.theme-dark .bg-white,
+html.theme-dark .bg-white\/95,
+html.theme-dark .studio-card {
+  background-color: #0D162C !important;
+  border-color: rgba(148, 163, 184, 0.22) !important;
+  box-shadow: 0 16px 38px -14px rgba(0, 0, 0, 0.55) !important;
 }
 
-html.theme-light main header {
-  background-color: rgba(255, 255, 255, 0.95) !important;
-  border-color: #e2e8f0 !important;
+html.theme-dark .bg-\[\#F8FAFC\],
+html.theme-dark .bg-slate-50,
+html.theme-dark .bg-slate-100 {
+  background-color: #13203D !important;
+  border-color: rgba(148, 163, 184, 0.24) !important;
 }
 
-/* Dark surfaces to clean white cards */
-html.theme-light .bg-\[\#0a1329\],
-html.theme-light .bg-\[\#0c162e\],
-html.theme-light .bg-\[\#0d1833\],
-html.theme-light .bg-\[\#0d1c3d\] {
-  background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
-  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 1px 2px -1px rgba(15, 23, 42, 0.05);
+html.theme-dark .hover\:bg-slate-50:hover,
+html.theme-dark .hover\:bg-slate-100:hover,
+html.theme-dark .hover\:bg-slate-200:hover,
+html.theme-dark .hover\:bg-amber-50:hover,
+html.theme-dark .hover\:bg-white:hover {
+  background-color: #1A2B52 !important;
 }
 
-/* Sub-panels & containers */
-html.theme-light .bg-\[\#080f21\],
-html.theme-light .bg-\[\#070e1e\],
-html.theme-light .bg-\[\#070d1c\],
-html.theme-light .bg-\[\#060b18\] {
-  background-color: #f8fafc !important;
-  border-color: #e2e8f0 !important;
-}
-
-html.theme-light .bg-\[\#122144\],
-html.theme-light .bg-\[\#112044\],
-html.theme-light .bg-\[\#0d1a36\] {
-  background-color: #f1f5f9 !important;
-  border-color: #cbd5e1 !important;
-}
-
-/* Gradients */
-html.theme-light .bg-gradient-to-r.from-\[\#0F2249\] {
-  background: linear-gradient(135deg, #f0f4ff 0%, #ffffff 50%, #fefce8 100%) !important;
-  border-color: rgba(246, 198, 43, 0.5) !important;
-}
-
-/* Typography Overrides */
-html.theme-light h1,
-html.theme-light h2,
-html.theme-light h3,
-html.theme-light h4,
-html.theme-light h5,
-html.theme-light h6,
-html.theme-light .font-display,
-html.theme-light .font-hero-headline {
-  color: #0f172a !important;
-}
-
-html.theme-light .text-white {
-  color: #0f172a !important;
-}
-
-/* Retain light text for colored action buttons */
-html.theme-light .bg-\[\#F6C62B\],
-html.theme-light .bg-\[\#F6C62B\] *,
-html.theme-light .text-slate-950 {
-  color: #020617 !important;
-}
-
-html.theme-light .bg-rose-600,
-html.theme-light .bg-rose-600 *,
-html.theme-light .bg-emerald-600,
-html.theme-light .bg-emerald-600 *,
-html.theme-light .bg-blue-600,
-html.theme-light .bg-blue-600 * {
-  color: #ffffff !important;
-}
-
-html.theme-light .text-slate-100,
-html.theme-light .text-slate-200,
-html.theme-light .text-slate-300 {
-  color: #334155 !important;
-}
-
-html.theme-light .text-slate-400 {
-  color: #64748b !important;
+/* Tone down light-mode ambient mesh glows in dark mode */
+html.theme-dark .bg-sky-200\/40,
+html.theme-dark .bg-amber-200\/45 {
+  opacity: 0.14 !important;
 }
 
 /* Borders */
-html.theme-light .border-slate-800,
-html.theme-light .border-slate-800\/80,
-html.theme-light .border-slate-700,
-html.theme-light .border-slate-700\/80 {
-  border-color: #e2e8f0 !important;
+html.theme-dark .border-slate-100,
+html.theme-dark .border-slate-200,
+html.theme-dark .border-slate-200\/70,
+html.theme-dark .border-slate-200\/75,
+html.theme-dark .border-slate-200\/80,
+html.theme-dark .border-slate-200\/90,
+html.theme-dark .border-slate-300,
+html.theme-dark .border-slate-300\/70,
+html.theme-dark .border-slate-300\/80,
+html.theme-dark .border-white\/60 {
+  border-color: rgba(148, 163, 184, 0.22) !important;
 }
 
-/* Form Inputs */
-html.theme-light input,
-html.theme-light select,
-html.theme-light textarea {
-  background-color: #ffffff !important;
-  color: #0f172a !important;
-  border-color: #cbd5e1 !important;
+html.theme-dark .border-amber-100,
+html.theme-dark .border-amber-200,
+html.theme-dark .border-amber-300,
+html.theme-dark .border-amber-300\/80,
+html.theme-dark .border-amber-400\/50 {
+  border-color: rgba(245, 197, 66, 0.35) !important;
 }
 
-html.theme-light input::placeholder,
-html.theme-light textarea::placeholder {
-  color: #94a3b8 !important;
+html.theme-dark .border-emerald-200,
+html.theme-dark .border-emerald-200\/60 {
+  border-color: rgba(16, 185, 129, 0.35) !important;
 }
 
-/* Scrollbars in Light Mode */
-html.theme-light ::-webkit-scrollbar-track {
-  background: #f1f5f9;
-}
-html.theme-light ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-}
-html.theme-light ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+html.theme-dark .border-rose-200 {
+  border-color: rgba(244, 63, 94, 0.35) !important;
 }
 
-/* Glass panels in Light Mode */
-html.theme-light .glass-panel {
-  background: rgba(255, 255, 255, 0.85) !important;
-  border-color: rgba(226, 232, 240, 0.9) !important;
-  box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.05);
+html.theme-dark .divide-slate-200\/80 > :not(:last-child),
+html.theme-dark .divide-slate-300\/70 > :not(:last-child) {
+  border-color: rgba(148, 163, 184, 0.18) !important;
 }
 
-html.theme-light .glass-panel-hover:hover {
-  background: rgba(248, 250, 252, 0.95) !important;
-  border-color: rgba(246, 198, 43, 0.6) !important;
+/* Text contrast on dark surfaces */
+html.theme-dark .text-slate-950,
+html.theme-dark .text-slate-900,
+html.theme-dark .text-slate-800 {
+  color: #F8FAFC !important;
 }
 
-/* Modals Overlay */
-html.theme-light .bg-black\/75,
-html.theme-light .bg-black\/85 {
-  background-color: rgba(15, 23, 42, 0.55) !important;
+html.theme-dark .text-slate-700,
+html.theme-dark .text-slate-600 {
+  color: #CBD5E1 !important;
+}
+
+html.theme-dark .text-slate-500,
+html.theme-dark .text-slate-400 {
+  color: #94A3B8 !important;
+}
+
+html.theme-dark .hover\:text-slate-950:hover,
+html.theme-dark .hover\:text-slate-900:hover,
+html.theme-dark .hover\:text-\[\#0F2249\]:hover {
+  color: #F5C542 !important;
+}
+
+/* Navy text & accents on dark background become warm honey gold */
+html.theme-dark .text-\[\#0F2249\],
+html.theme-dark .text-\[\#0F2249\]\/80,
+html.theme-dark .text-\[\#0F2249\]\/75,
+html.theme-dark .text-\[\#0F2249\]\/70 {
+  color: #F5C542 !important;
+}
+
+/* Tinted status pills on dark surfaces */
+html.theme-dark .bg-amber-50,
+html.theme-dark .bg-amber-50\/60,
+html.theme-dark .bg-amber-100,
+html.theme-dark .bg-amber-100\/80,
+html.theme-dark .bg-\[\#F5C542\]\/45 {
+  background-color: rgba(245, 197, 66, 0.16) !important;
+  border-color: rgba(245, 197, 66, 0.35) !important;
+  color: #F5C542 !important;
+}
+
+html.theme-dark .text-amber-700,
+html.theme-dark .text-amber-600 {
+  color: #F5C542 !important;
+}
+
+html.theme-dark .bg-emerald-50,
+html.theme-dark .bg-emerald-50\/70,
+html.theme-dark .bg-emerald-100,
+html.theme-dark .bg-emerald-100\/80 {
+  background-color: rgba(16, 185, 129, 0.14) !important;
+  border-color: rgba(16, 185, 129, 0.35) !important;
+}
+
+html.theme-dark .text-emerald-800,
+html.theme-dark .text-emerald-700,
+html.theme-dark .text-emerald-600 {
+  color: #6EE7B7 !important;
+}
+
+html.theme-dark .bg-rose-50 {
+  background-color: rgba(244, 63, 94, 0.15) !important;
+  border-color: rgba(244, 63, 94, 0.35) !important;
+}
+html.theme-dark .text-rose-700,
+html.theme-dark .text-rose-600 {
+  color: #FDA4AF !important;
+}
+
+/* Solid Navy & Gold action elements stay crisp without clobbering inner accents */
+html.theme-dark .bg-\[\#0F2249\]:not(.animate-bounce) {
+  background-color: #152D5E !important;
+  border-color: rgba(245, 197, 66, 0.28);
+}
+html.theme-dark .bg-\[\#0F2249\].animate-bounce {
+  background-color: #F5C542 !important;
+}
+html.theme-dark .bg-\[\#0F2249\],
+html.theme-dark .bg-\[\#0F2249\] .text-white,
+html.theme-dark .bg-\[\#0F2249\] h2,
+html.theme-dark .bg-\[\#0F2249\] h3 {
+  color: #FFFFFF !important;
+}
+html.theme-dark .bg-\[\#0F2249\] .text-\[\#F5C542\],
+html.theme-dark .bg-\[\#0F2249\] .text-\[\#F6C62B\] {
+  color: #F5C542 !important;
+}
+html.theme-dark .bg-\[\#0F2249\] .text-emerald-300 {
+  color: #6EE7B7 !important;
+}
+html.theme-dark .bg-\[\#0F2249\] .text-rose-300 {
+  color: #FDA4AF !important;
+}
+html.theme-dark .bg-\[\#0F2249\] .text-slate-200 {
+  color: #E2E8F0 !important;
+}
+html.theme-dark .bg-\[\#0F2249\] .text-slate-300 {
+  color: #CBD5E1 !important;
+}
+
+html.theme-dark .bg-\[\#F5C542\],
+html.theme-dark .bg-\[\#F5C542\] *,
+html.theme-dark .bg-\[\#F6C62B\],
+html.theme-dark .bg-\[\#F6C62B\] * {
+  color: #020617 !important;
+}
+
+/* Form controls (exclude range sliders and inline bg-transparent inputs) */
+html.theme-dark input:not([type='range']):not(.bg-transparent),
+html.theme-dark select,
+html.theme-dark textarea {
+  background-color: #091124 !important;
+  color: #F8FAFC !important;
+  border-color: rgba(148, 163, 184, 0.3) !important;
+}
+html.theme-dark input::placeholder,
+html.theme-dark textarea::placeholder {
+  color: #64748B !important;
+}
+
+/* ========================================================
+   LIGHT STUDIO PORTAL ADAPTATION (.portal-light)
+   High-contrast accessible light theme for Dashboard & Profile
+   ======================================================== */
+.portal-light {
+  background-color: #FAFAF7 !important;
+  color: #0F172A !important;
+}
+
+.portal-light aside {
+  background-color: #FFFFFF !important;
+  border-color: #CBD5E1 !important;
+}
+
+.portal-light header,
+.portal-light main header {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: #CBD5E1 !important;
+}
+
+/* Primary elevated surfaces */
+.portal-light .bg-\[\#0a1329\],
+.portal-light .bg-\[\#0c162e\],
+.portal-light .bg-\[\#0d1833\],
+.portal-light .bg-\[\#0d1c3d\],
+.portal-light .bg-\[\#0d1426\],
+.portal-light .bg-\[\#0b1120\],
+.portal-light .bg-\[\#111b33\] {
+  background-color: #FFFFFF !important;
+  border-color: #CBD5E1 !important;
+  box-shadow: 0 4px 18px -6px rgba(15, 23, 42, 0.08);
+}
+
+/* Inset / sub-panel surfaces */
+.portal-light .bg-\[\#060913\],
+.portal-light .bg-\[\#0a0f1e\],
+.portal-light .bg-\[\#080f21\],
+.portal-light .bg-\[\#080f21\]\/60,
+.portal-light .bg-\[\#070e1e\],
+.portal-light .bg-\[\#070d1c\],
+.portal-light .bg-\[\#060b18\],
+.portal-light .bg-slate-900 {
+  background-color: #F1F0EA !important;
+  border-color: #CBD5E1 !important;
+}
+
+/* Input & secondary button surfaces */
+.portal-light .bg-\[\#122144\],
+.portal-light .bg-\[\#112044\],
+.portal-light .bg-\[\#0d1a36\] {
+  background-color: #F1F5F9 !important;
+  border-color: #CBD5E1 !important;
+  color: #0F172A !important;
+}
+
+/* User chat bubble in Dashboard AI Chat stays rich Navy */
+.portal-light .bg-\[\#1b2f60\] {
+  background-color: #0F2249 !important;
+  border-color: #0F2249 !important;
+  color: #FFFFFF !important;
+}
+.portal-light .bg-\[\#1b2f60\] * {
+  color: #FFFFFF !important;
+}
+
+/* Headings and primary white text on light surfaces */
+.portal-light h1,
+.portal-light h2,
+.portal-light h3,
+.portal-light h4,
+.portal-light h5,
+.portal-light h6,
+.portal-light .text-white {
+  color: #0F172A !important;
+}
+
+/* Body & muted neutral text */
+.portal-light .text-slate-100,
+.portal-light .text-slate-200,
+.portal-light .text-slate-300 {
+  color: #1E293B !important;
+}
+
+.portal-light .text-slate-400,
+.portal-light .text-slate-500,
+.portal-light .text-slate-600 {
+  color: #475569 !important;
+}
+
+/* Clean hover states inside light portal */
+.portal-light .hover\:bg-slate-800:hover,
+.portal-light .hover\:bg-slate-800\/60:hover,
+.portal-light .hover\:bg-slate-700:hover,
+.portal-light .hover\:bg-slate-700\/80:hover,
+.portal-light .hover\:bg-\[\#192f5e\]:hover {
+  background-color: #E2E8F0 !important;
+}
+.portal-light .hover\:text-white:hover {
+  color: #0F172A !important;
+}
+.portal-light .hover\:bg-rose-600:hover,
+.portal-light .hover\:bg-rose-600:hover * {
+  color: #FFFFFF !important;
+}
+
+/* Borders */
+.portal-light .border-slate-800,
+.portal-light .border-slate-800\/80,
+.portal-light .border-slate-700,
+.portal-light .border-slate-700\/80,
+.portal-light .border-slate-700\/60 {
+  border-color: #CBD5E1 !important;
+}
+
+/* Darken neon/pastel accent text when sitting on white/ivory cards */
+.portal-light .text-\[\#F6C62B\],
+.portal-light .text-\[\#F5C542\],
+.portal-light .text-amber-300,
+.portal-light .text-amber-400,
+.portal-light .text-amber-600 {
+  color: #B45309 !important;
+}
+
+.portal-light .text-emerald-200,
+.portal-light .text-emerald-300,
+.portal-light .text-emerald-400 {
+  color: #047857 !important;
+}
+
+.portal-light .text-cyan-300,
+.portal-light .text-cyan-400,
+.portal-light .text-blue-300,
+.portal-light .text-blue-400,
+.portal-light .text-sky-300,
+.portal-light .text-sky-400 {
+  color: #1D4ED8 !important;
+}
+
+.portal-light .text-purple-300,
+.portal-light .text-purple-400,
+.portal-light .text-indigo-300,
+.portal-light .text-indigo-400 {
+  color: #6D28D9 !important;
+}
+
+.portal-light .text-teal-300,
+.portal-light .text-teal-400 {
+  color: #0F766E !important;
+}
+
+.portal-light .text-rose-200,
+.portal-light .text-rose-300,
+.portal-light .text-rose-400 {
+  color: #BE123C !important;
+}
+
+/* Boost tinted badge backgrounds on light mode */
+.portal-light .bg-amber-500\/20,
+.portal-light .bg-\[\#F6C62B\]\/20,
+.portal-light .bg-\[\#F6C62B\]\/10 {
+  background-color: #FEF3C7 !important;
+}
+.portal-light .bg-emerald-500\/20,
+.portal-light .bg-emerald-500\/10,
+.portal-light .bg-emerald-950\/60,
+.portal-light .bg-emerald-950\/80 {
+  background-color: #D1FAE5 !important;
+  border-color: #6EE7B7 !important;
+}
+.portal-light .bg-blue-500\/20,
+.portal-light .bg-cyan-500\/10,
+.portal-light .bg-cyan-500\/20,
+.portal-light .bg-sky-500\/20 {
+  background-color: #DBEAFE !important;
+}
+.portal-light .bg-purple-500\/20,
+.portal-light .bg-purple-500\/10,
+.portal-light .bg-indigo-500\/20 {
+  background-color: #EDE9FE !important;
+}
+.portal-light .bg-teal-500\/20,
+.portal-light .bg-teal-500\/10 {
+  background-color: #CCFBF1 !important;
+}
+.portal-light .bg-rose-500\/20,
+.portal-light .bg-rose-500\/10 {
+  background-color: #FFE4E6 !important;
+}
+
+/* Inputs (exclude range sliders and inline bg-transparent inputs) */
+.portal-light input:not([type='range']):not(.bg-transparent),
+.portal-light select,
+.portal-light textarea {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  border-color: #94A3B8 !important;
+}
+
+.portal-light input::placeholder,
+.portal-light textarea::placeholder {
+  color: #64748B !important;
+}
+
+.portal-light .bg-slate-800,
+.portal-light .bg-slate-800\/80,
+.portal-light .bg-slate-800\/60,
+.portal-light .bg-slate-800\/40,
+.portal-light .bg-slate-800\/50 {
+  background-color: #E2E8F0 !important;
+  color: #0F172A !important;
+  border-color: #CBD5E1 !important;
+}
+
+/* Solid dark-navy containers & hero banners preserve high-contrast white + bright gold text */
+.portal-light .bg-\[\#0F2249\],
+.portal-light .bg-\[\#0F2249\] *,
+.portal-light .portal-hero-banner,
+.portal-light .portal-hero-banner h1,
+.portal-light .portal-hero-banner h2,
+.portal-light .portal-hero-banner h3,
+.portal-light .portal-hero-banner p,
+.portal-light .portal-hero-banner .text-white,
+.portal-light .bg-rose-600,
+.portal-light .bg-rose-600 *,
+.portal-light .bg-emerald-600,
+.portal-light .bg-emerald-600 *,
+.portal-light .bg-blue-600,
+.portal-light .bg-blue-600 * {
+  color: #FFFFFF !important;
+}
+
+.portal-light .portal-hero-banner .text-slate-300 {
+  color: #E2E8F0 !important;
+}
+
+/* Keep translucent dark badges inside dark hero banners readable */
+.portal-light .portal-hero-banner .bg-amber-500\/20 {
+  background-color: rgba(245, 197, 66, 0.2) !important;
+}
+.portal-light .portal-hero-banner .bg-emerald-500\/20,
+.portal-light .portal-hero-banner .bg-emerald-950\/60 {
+  background-color: rgba(16, 185, 129, 0.2) !important;
+  border-color: rgba(52, 211, 153, 0.45) !important;
+}
+
+.portal-light .portal-hero-banner .text-\[\#F6C62B\],
+.portal-light .portal-hero-banner .text-\[\#F5C542\] {
+  color: #F6C62B !important;
+}
+
+.portal-light .portal-hero-banner .text-emerald-300,
+.portal-light .portal-hero-banner .text-emerald-400 {
+  color: #34D399 !important;
+}
+
+/* Secondary buttons placed inside dark hero banners get clean white button look */
+.portal-light .portal-hero-banner button.bg-\[\#080f21\],
+.portal-light .portal-hero-banner button.bg-slate-800 {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  border-color: transparent !important;
+}
+.portal-light .portal-hero-banner button.bg-\[\#080f21\] *,
+.portal-light .portal-hero-banner button.bg-slate-800 * {
+  color: #0F172A !important;
+}
+.portal-light .portal-hero-banner button.bg-\[\#080f21\]:hover,
+.portal-light .portal-hero-banner button.bg-slate-800:hover {
+  background-color: #F1F5F9 !important;
+}
+
+/* Primary yellow CTA buttons always have dark navy/black text */
+.portal-light .bg-\[\#F6C62B\],
+.portal-light .bg-\[\#F6C62B\] *,
+.portal-light .bg-\[\#F5C542\],
+.portal-light .bg-\[\#F5C542\] *,
+.portal-light .text-slate-950 {
+  color: #020617 !important;
 }

@@ -1,4 +1,5 @@
 export type SubjectCategory = 'all' | 'math-science' | 'writing-languages' | 'tech' | 'business-career';
+export type PublicPage = 'home' | 'how' | 'experts' | 'community' | 'pricing' | 'about';
 
 export interface Expert {
   id: string;
@@ -60,12 +61,29 @@ export interface DashboardSession {
   urgentUsed?: boolean;
 }
 
+export interface VerifiedSource {
+  title: string;
+  uri?: string;
+  type: 'web' | 'document' | 'textbook';
+}
+
+export interface StudyDocumentPayload {
+  id: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+  base64Data: string;
+}
+
 export interface ChatMessage {
   id: string;
   sender: 'user' | 'ai';
   text: string;
   timestamp: string;
   sourceCitation?: string;
+  sources?: VerifiedSource[];
+  searchQueries?: string[];
+  groundingMode?: 'web' | 'document' | 'hybrid';
   confidence?: string;
   recommendedExpertId?: string;
 }
@@ -77,19 +95,4 @@ export interface TeamMember {
   initials: string;
   accentColor: string;
   bio: string;
-}
-
-export interface SurveyStat {
-  label: string;
-  percentage: number;
-  count: number;
-  total: number;
-  color?: string;
-}
-
-export interface FinancialYear {
-  year: string;
-  income: number;
-  expenses: number;
-  profit: number;
 }
