@@ -43,18 +43,19 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/45 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl relative">
-        <div className="px-6 py-4 bg-[#FAFAF7] border-b border-slate-200 flex items-center justify-between">
+      <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl relative">
+        <div className="px-6 py-4 bg-[#FAFAF5] border-b border-slate-200 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#0F2249] text-[#F5C542] flex items-center justify-center font-bold text-xs shadow-sm">
+            <div className="w-10 h-10 rounded-xl bg-[#0F2249] text-[#F5C52C] flex items-center justify-center font-bold text-xs shadow-sm">
               {expert.initials}
             </div>
             <div>
-              <h3 className="font-bold text-slate-950 text-base">Book a Session</h3>
+              <h3 className="font-editorial text-[#0F2249] text-lg">Book a Session</h3>
               <p className="text-xs text-slate-500">with {expert.name}</p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="p-1.5 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
           >
@@ -73,8 +74,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                 required
                 value={topic}
                 onChange={e => setTopic(e.target.value)}
-                placeholder="e.g. Calculus derivatives, Physics mechanics..."
-                className="w-full bg-[#FAFAF7] border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0F2249]"
+                placeholder="e.g. Calculus chain rule, physics mechanics, essay thesis..."
+                className="w-full bg-[#FAFAF5] border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0F2249]"
               />
             </div>
 
@@ -83,7 +84,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
               <select
                 value={date}
                 onChange={e => setDate(e.target.value)}
-                className="w-full bg-[#FAFAF7] border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-[#0F2249]"
+                className="w-full bg-[#FAFAF5] border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-[#0F2249]"
               >
                 <option value="Today (Fastest available)">Today (Fastest available)</option>
                 <option value="Tomorrow">Tomorrow</option>
@@ -102,7 +103,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                     className={`py-2 px-3 rounded-xl border text-xs font-semibold transition-colors cursor-pointer ${
                       time === t
                         ? 'bg-[#0F2249] text-white border-[#0F2249]'
-                        : 'bg-[#FAFAF7] text-slate-700 border-slate-200 hover:border-slate-300'
+                        : 'bg-[#FAFAF5] text-slate-700 border-slate-200 hover:border-slate-300'
                     }`}
                   >
                     {t}
@@ -113,10 +114,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
             <div
               onClick={() => setUrgentUpgrade(!urgentUpgrade)}
-              className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${
+              className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-start gap-3 ${
                 urgentUpgrade
-                  ? 'bg-amber-50 border-[#F5C542]'
-                  : 'bg-[#FAFAF7] border-slate-200 hover:border-slate-300'
+                  ? 'bg-amber-50 border-[#F5C52C]'
+                  : 'bg-[#FAFAF5] border-slate-200 hover:border-slate-300'
               }`}
             >
               <input
@@ -127,7 +128,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
               />
               <div className="flex-1">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-900 text-xs flex items-center gap-1">
+                  <span className="font-bold text-[#0F2249] text-xs flex items-center gap-1">
                     <Zap className="w-3.5 h-3.5 text-amber-500" />
                     <span>Urgent priority (+Q25)</span>
                   </span>
@@ -146,20 +147,20 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   Q{basePrice} {urgentUpgrade ? '+ Q25 urgent' : ''}
                 </div>
               </div>
-              <div className="text-2xl font-extrabold text-slate-950">Q{totalPrice}</div>
+              <div className="font-editorial text-3xl text-[#0F2249]">Q{totalPrice}</div>
             </div>
 
             <div className="flex items-center gap-3 pt-1">
               <button
                 type="button"
                 onClick={onClose}
-                className="w-1/2 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
+                className="w-1/2 py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="w-1/2 py-2.5 rounded-full bg-[#0F2249] hover:bg-[#163066] text-white text-xs font-bold cursor-pointer shadow-sm"
+                className="w-1/2 py-2.5 rounded-lg bg-[#0F2249] hover:bg-[#19346b] text-white text-xs font-bold cursor-pointer shadow-sm"
               >
                 Confirm booking
               </button>
@@ -170,9 +171,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({
             <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto border border-emerald-200">
               <CheckCircle2 className="w-6 h-6" />
             </div>
-            <h4 className="text-lg font-bold text-slate-950">Session Booked</h4>
+            <h4 className="font-editorial text-xl text-[#0F2249]">Session Booked</h4>
             <p className="text-xs text-slate-600">
-              You are booked with <strong>{expert.name}</strong> for {date}. Check your dashboard for the room link.
+              You are booked with <strong>{expert.name}</strong> ({date}). Check your portal for the session link.
             </p>
           </div>
         )}
@@ -222,7 +223,7 @@ export const TrialModal: React.FC<{
             user.displayName || user.email?.split('@')[0] || 'Student',
             user.email || '',
             user.uid,
-            user.photoURL || undefined
+            undefined
           );
         }
         onClose();
@@ -265,13 +266,14 @@ export const TrialModal: React.FC<{
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/45 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative">
-        <div className="px-6 py-4 bg-[#FAFAF7] border-b border-slate-200 flex items-center justify-between">
+      <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl relative">
+        <div className="px-6 py-4 bg-[#FAFAF5] border-b border-slate-200 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-[#0F2249]" />
-            <h3 className="font-bold text-slate-950 text-base">Start your 3-day free trial</h3>
+            <h3 className="font-editorial text-[#0F2249] text-lg">Start your 3-day free trial</h3>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="p-1.5 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100 cursor-pointer"
           >
@@ -284,7 +286,7 @@ export const TrialModal: React.FC<{
             type="button"
             onClick={handleGoogleRegister}
             disabled={isLoading}
-            className="w-full py-2.5 px-4 rounded-full bg-white hover:bg-slate-50 text-slate-900 border border-slate-300 font-semibold text-xs flex items-center justify-center gap-3 shadow-sm transition-all cursor-pointer disabled:opacity-60"
+            className="w-full py-2.5 px-4 rounded-lg bg-white hover:bg-slate-50 text-slate-900 border border-slate-300 font-semibold text-xs flex items-center justify-center gap-3 shadow-xs transition-all cursor-pointer disabled:opacity-60"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.05h3.9c2.28-2.1 3.645-5.18 3.645-9.14z" />
@@ -316,7 +318,7 @@ export const TrialModal: React.FC<{
                 value={name}
                 onChange={e => setName(e.target.value)}
                 placeholder="e.g. Pablo Vettorazzi"
-                className="w-full bg-[#FAFAF7] border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0F2249]"
+                className="w-full bg-[#FAFAF5] border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0F2249]"
               />
             </div>
 
@@ -328,7 +330,7 @@ export const TrialModal: React.FC<{
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="you@school.edu or gmail.com"
-                className="w-full bg-[#FAFAF7] border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0F2249]"
+                className="w-full bg-[#FAFAF5] border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0F2249]"
               />
             </div>
 
@@ -341,7 +343,7 @@ export const TrialModal: React.FC<{
                 onChange={e => setPassword(e.target.value)}
                 placeholder="At least 6 characters"
                 minLength={6}
-                className="w-full bg-[#FAFAF7] border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0F2249]"
+                className="w-full bg-[#FAFAF5] border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0F2249]"
               />
             </div>
 
@@ -350,7 +352,7 @@ export const TrialModal: React.FC<{
               <select
                 value={grade}
                 onChange={e => setGrade(e.target.value)}
-                className="w-full bg-[#FAFAF7] border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-[#0F2249]"
+                className="w-full bg-[#FAFAF5] border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-[#0F2249]"
               >
                 <option value="High School">High School</option>
                 <option value="Middle School">Middle School</option>
@@ -359,18 +361,18 @@ export const TrialModal: React.FC<{
               </select>
             </div>
 
-            <div className="p-3 rounded-2xl bg-[#FAFAF7] border border-slate-200 text-[11px] text-slate-600 space-y-1">
-              <div className="flex items-center gap-1.5 text-slate-900 font-semibold">
+            <div className="p-3 rounded-xl bg-[#EBF0F7] border border-slate-200/80 text-[11px] text-slate-600 space-y-1">
+              <div className="flex items-center gap-1.5 text-[#0F2249] font-semibold">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Free 3-Day Trial · No card required</span>
               </div>
-              <p>Unlocks unlimited 24/7 AI tutoring and your full study portal.</p>
+              <p>Unlocks unlimited 24/7 AI tutoring, study notes upload, and your full student portal.</p>
             </div>
 
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 rounded-full bg-[#0F2249] hover:bg-[#163066] text-white font-bold text-xs transition-colors cursor-pointer shadow-sm disabled:opacity-50"
+              className="w-full py-3 rounded-lg bg-[#0F2249] hover:bg-[#19346b] text-white font-bold text-xs transition-colors cursor-pointer shadow-sm disabled:opacity-50"
             >
               {isLoading ? 'Creating Account...' : 'Create Account & Open Portal'}
             </button>
@@ -411,7 +413,7 @@ export const LoginModal: React.FC<{
           user.displayName || user.email?.split('@')[0] || 'Pablo Vettorazzi',
           user.email || '',
           user.uid,
-          user.photoURL || undefined
+          undefined
         );
         onClose();
       } catch (err) {
@@ -453,10 +455,11 @@ export const LoginModal: React.FC<{
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/45 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative">
-        <div className="px-6 py-4 bg-[#FAFAF7] border-b border-slate-200 flex items-center justify-between">
-          <h3 className="font-bold text-slate-950 text-base">Log in to ProLnk</h3>
+      <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl relative">
+        <div className="px-6 py-4 bg-[#FAFAF5] border-b border-slate-200 flex items-center justify-between">
+          <h3 className="font-editorial text-[#0F2249] text-lg">Log in to ProLnk</h3>
           <button
+            type="button"
             onClick={onClose}
             className="p-1.5 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100 cursor-pointer"
           >
@@ -465,11 +468,10 @@ export const LoginModal: React.FC<{
         </div>
 
         <div className="p-6 space-y-4 text-xs sm:text-sm">
-          {/* Fast 1-click Demo Entry at top for instant preview */}
           <button
             type="button"
             onClick={handleQuickDemo}
-            className="w-full py-3 px-4 rounded-full bg-[#F5C542] hover:bg-[#ffd45c] text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+            className="w-full py-3 px-4 rounded-lg bg-[#F5C52C] hover:bg-[#eab921] text-[#0F2249] font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
           >
             <Sparkles className="w-4 h-4" />
             <span>Fast Enter: Demo Student Account</span>
@@ -479,7 +481,7 @@ export const LoginModal: React.FC<{
             type="button"
             onClick={handleGoogleLogin}
             disabled={isLoading}
-            className="w-full py-2.5 px-4 rounded-full bg-white hover:bg-slate-50 text-slate-900 border border-slate-300 font-semibold text-xs flex items-center justify-center gap-3 shadow-sm transition-all cursor-pointer disabled:opacity-60"
+            className="w-full py-2.5 px-4 rounded-lg bg-white hover:bg-slate-50 text-slate-900 border border-slate-300 font-semibold text-xs flex items-center justify-center gap-3 shadow-xs transition-all cursor-pointer disabled:opacity-60"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.05h3.9c2.28-2.1 3.645-5.18 3.645-9.14z" />
@@ -511,7 +513,7 @@ export const LoginModal: React.FC<{
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="you@school.edu"
-                className="w-full bg-[#FAFAF7] border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0F2249]"
+                className="w-full bg-[#FAFAF5] border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0F2249]"
               />
             </div>
 
@@ -523,14 +525,14 @@ export const LoginModal: React.FC<{
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-[#FAFAF7] border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0F2249]"
+                className="w-full bg-[#FAFAF5] border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0F2249]"
               />
             </div>
 
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 rounded-full bg-[#0F2249] hover:bg-[#163066] text-white font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
+              className="w-full py-3 rounded-lg bg-[#0F2249] hover:bg-[#19346b] text-white font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
             >
               {isLoading ? 'Logging in...' : 'Log in to Dashboard'}
             </button>
@@ -541,11 +543,11 @@ export const LoginModal: React.FC<{
   );
 };
 
-export const QuestionModal: React.FC<{ isOpen: boolean; onClose: () => void; onSubmitQuestion: (title: string, category: string) => void }> = ({
-  isOpen,
-  onClose,
-  onSubmitQuestion
-}) => {
+export const QuestionModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmitQuestion: (title: string, category: string) => void;
+}> = ({ isOpen, onClose, onSubmitQuestion }) => {
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('Physics');
 
@@ -561,10 +563,11 @@ export const QuestionModal: React.FC<{ isOpen: boolean; onClose: () => void; onS
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/45 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl">
-        <div className="px-6 py-4 bg-[#FAFAF7] border-b border-slate-200 flex items-center justify-between">
-          <h3 className="font-bold text-slate-950 text-base">Ask the Community</h3>
+      <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+        <div className="px-6 py-4 bg-[#FAFAF5] border-b border-slate-200 flex items-center justify-between">
+          <h3 className="font-editorial text-[#0F2249] text-lg">Ask the Community</h3>
           <button
+            type="button"
             onClick={onClose}
             className="p-1.5 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100 cursor-pointer"
           >
@@ -581,7 +584,7 @@ export const QuestionModal: React.FC<{ isOpen: boolean; onClose: () => void; onS
               value={title}
               onChange={e => setTitle(e.target.value)}
               placeholder="e.g. How do I balance redox equations without guessing?"
-              className="w-full bg-[#FAFAF7] border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0F2249]"
+              className="w-full bg-[#FAFAF5] border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0F2249]"
             />
           </div>
 
@@ -590,7 +593,7 @@ export const QuestionModal: React.FC<{ isOpen: boolean; onClose: () => void; onS
             <select
               value={category}
               onChange={e => setCategory(e.target.value)}
-              className="w-full bg-[#FAFAF7] border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-[#0F2249]"
+              className="w-full bg-[#FAFAF5] border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-[#0F2249]"
             >
               <option value="Chemistry">Chemistry</option>
               <option value="Physics">Physics</option>
@@ -604,13 +607,13 @@ export const QuestionModal: React.FC<{ isOpen: boolean; onClose: () => void; onS
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
+              className="px-5 py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-6 py-2.5 rounded-full bg-[#0F2249] hover:bg-[#163066] text-white font-bold text-xs cursor-pointer shadow-sm"
+              className="px-6 py-2.5 rounded-lg bg-[#0F2249] hover:bg-[#19346b] text-white font-bold text-xs cursor-pointer shadow-sm"
             >
               Post question
             </button>
@@ -621,15 +624,19 @@ export const QuestionModal: React.FC<{ isOpen: boolean; onClose: () => void; onS
   );
 };
 
-export const ContactModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
+export const ContactModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
+  isOpen,
+  onClose
+}) => {
   const [submitted, setSubmitted] = useState(false);
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/45 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative p-6 space-y-4">
+      <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl relative p-6 space-y-4">
         <button
+          type="button"
           onClick={onClose}
           className="absolute top-4 right-4 p-1.5 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100 cursor-pointer"
         >
@@ -637,10 +644,10 @@ export const ContactModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
         </button>
 
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-[#FAFAF7] border border-slate-200 flex items-center justify-center">
+          <div className="w-9 h-9 rounded-xl bg-[#FAFAF5] border border-slate-200 flex items-center justify-center">
             <Mail className="w-4 h-4 text-[#0F2249]" />
           </div>
-          <h3 className="font-bold text-slate-950 text-lg">Contact ProLnk</h3>
+          <h3 className="font-editorial text-[#0F2249] text-lg">Contact ProLnk</h3>
         </div>
 
         {!submitted ? (
@@ -657,7 +664,7 @@ export const ContactModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                 type="email"
                 required
                 placeholder="you@email.com"
-                className="w-full bg-[#FAFAF7] border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0F2249]"
+                className="w-full bg-[#FAFAF5] border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0F2249]"
               />
             </div>
 
@@ -667,13 +674,13 @@ export const ContactModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                 rows={3}
                 required
                 placeholder="How can we help you?"
-                className="w-full bg-[#FAFAF7] border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0F2249]"
+                className="w-full bg-[#FAFAF5] border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0F2249]"
               />
             </div>
 
             <button
               type="submit"
-              className="w-full py-3 bg-[#0F2249] hover:bg-[#163066] text-white font-bold text-xs rounded-full cursor-pointer"
+              className="w-full py-3 bg-[#0F2249] hover:bg-[#19346b] text-white font-bold text-xs rounded-lg cursor-pointer"
             >
               Send message
             </button>

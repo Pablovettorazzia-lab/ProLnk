@@ -13,10 +13,14 @@ const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 
+const typedConfig = firebaseConfig as typeof firebaseConfig & {
+  firestoreDatabaseId?: string;
+};
+
 const databaseId =
-  firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
-    ? firebaseConfig.firestoreDatabaseId
-    : undefined;
+  typedConfig.firestoreDatabaseId && typedConfig.firestoreDatabaseId !== '(default)'
+    ? typedConfig.firestoreDatabaseId
+    : 'ai-studio-prolnk-7f61c618-991f-462c-85f1-08c01a0eaf6d';
 
 let dbInstance: Firestore;
 try {

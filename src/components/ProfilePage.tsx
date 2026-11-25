@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { AuthUser } from '../App';
 import { StudyProgressChart } from './StudyProgressChart';
+import { UserAvatar } from './UserAvatar';
 
 interface ProfilePageProps {
   user: AuthUser;
@@ -41,12 +42,17 @@ interface ProfilePageProps {
   onToggleDarkMode?: () => void;
 }
 
+const makeSvgAvatar = (bg: string, fg: string, symbol: string) =>
+  `data:image/svg+xml;utf8,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="${bg}"/><text x="50" y="61" text-anchor="middle" font-family="Georgia, serif" font-weight="700" font-size="38" fill="${fg}">${symbol}</text></svg>`
+  )}`;
+
 const PRESET_AVATARS = [
-  { id: 'av1', label: 'Tech Student', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80' },
-  { id: 'av2', label: 'Engineer', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=250&q=80' },
-  { id: 'av3', label: 'Scientist', url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=250&q=80' },
-  { id: 'av4', label: 'Scholar', url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=250&q=80' },
-  { id: 'av5', label: 'Mathematician', url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=250&q=80' },
+  { id: 'av1', label: 'Calculus', url: makeSvgAvatar('#0F2249', '#F5C52C', 'Σ') },
+  { id: 'av2', label: 'Code', url: makeSvgAvatar('#152D5E', '#FFFFFF', '</>') },
+  { id: 'av3', label: 'Science', url: makeSvgAvatar('#F5C52C', '#0F2249', 'π') },
+  { id: 'av4', label: 'Physics', url: makeSvgAvatar('#E8EEF6', '#0F2249', 'Δ') },
+  { id: 'av5', label: 'Scholar', url: makeSvgAvatar('#065F46', '#ECFDF5', '★') },
 ];
 
 const SUGGESTED_SUBJECTS = [
@@ -114,7 +120,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
         major: profileMajor.trim(),
         semester: profileSemester.trim(),
         learningGoal: profileLearningGoal.trim(),
-        photoURL: profilePhotoURL || undefined,
+        photoURL: profilePhotoURL.trim(),
         targetSubjects: profileSubjects
       });
     }
@@ -216,7 +222,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
             {/* Student Summary Card */}
             <div className="bg-[#0c162e] border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
               {/* Cover Banner */}
-              <div className="portal-hero-banner h-28 bg-gradient-to-r from-[#0F2249] via-[#162e63] to-[#0a1530] relative">
+              <div className="portal-hero-banner h-24 bg-gradient-to-r from-[#0F2249] via-[#162e63] to-[#0a1530] relative">
                 <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#F6C62B_1px,transparent_1px)] [background-size:14px_14px]"></div>
                 <div className="absolute top-3 right-3">
                   <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-300 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-md backdrop-blur-sm">
@@ -227,28 +233,21 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               </div>
 
               {/* Avatar + Info Body */}
-              <div className="px-5 pb-5 relative -mt-12 text-center sm:text-left">
-                <div className="flex flex-col sm:flex-row items-center gap-4">
+              <div className="px-5 pb-5 relative -mt-10 text-center sm:text-left">
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
                   {/* Avatar with Camera Button */}
                   <div className="relative group shrink-0">
-                    {profilePhotoURL ? (
-                      <img
-                        src={profilePhotoURL}
-                        alt={profileName}
-                        className={`w-20 h-20 rounded-2xl object-cover border-4 shadow-lg bg-[#080f21] ${
-                          isDarkMode ? 'border-[#0c162e]' : 'border-white'
-                        }`}
-                      />
-                    ) : (
-                      <div
-                        className={`w-20 h-20 rounded-2xl bg-gradient-to-br from-[#0F2249] to-[#F6C62B] text-white font-extrabold text-2xl flex items-center justify-center border-4 shadow-lg ${
-                          isDarkMode ? 'border-[#0c162e]' : 'border-white'
-                        }`}
-                      >
-                        {profileName.split(' ').map(n => n[0]).join('').substring(0, 2) || 'U'}
-                      </div>
-                    )}
+                    <UserAvatar
+                      photoURL={profilePhotoURL}
+                      name={profileName || 'Student'}
+                      size="xl"
+                      shape="rounded"
+                      className={`border-4 shadow-lg ${
+                        isDarkMode ? 'border-[#0c162e]' : 'border-white'
+                      }`}
+                    />
                     <button
+                      type="button"
                       onClick={() => setShowAvatarPicker(prev => !prev)}
                       className="absolute -bottom-1 -right-1 p-1.5 rounded-lg bg-[#F6C62B] text-slate-950 hover:bg-[#ffd744] shadow-md transition-transform hover:scale-110 cursor-pointer"
                       title="Change profile avatar"
@@ -258,9 +257,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                   </div>
 
                   {/* Name and University */}
-                  <div className="overflow-hidden flex-1 space-y-0.5">
-                    <h2 className="text-lg font-bold text-white truncate">{profileName || 'Student'}</h2>
-                    <p className="text-xs text-slate-400 truncate">{user.email}</p>
+                  <div className="overflow-hidden flex-1 sm:pt-1 space-y-0.5">
+                    <h2 className="profile-banner-name text-lg font-bold text-white truncate">{profileName || 'Student'}</h2>
+                    <p className="text-xs text-slate-400 truncate sm:mt-3.5">{user.email}</p>
                     <p className="text-xs text-[#F6C62B] font-medium flex items-center justify-center sm:justify-start gap-1 truncate pt-0.5">
                       <School className="w-3.5 h-3.5 shrink-0" />
                       <span className="truncate">{profileUniversity}</span>
@@ -274,6 +273,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-semibold text-slate-200">Select an avatar:</span>
                       <button
+                        type="button"
                         onClick={() => setShowAvatarPicker(false)}
                         className="text-slate-400 hover:text-white text-[11px] cursor-pointer"
                       >
@@ -281,9 +281,26 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-5 gap-1.5">
+                    <div className="grid grid-cols-6 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfilePhotoURL('');
+                          setShowAvatarPicker(false);
+                          showToast('Default user icon selected.');
+                        }}
+                        className={`p-1 rounded-lg border transition-all cursor-pointer flex items-center justify-center ${
+                          !profilePhotoURL
+                            ? 'bg-[#0F2249] border-[#F6C62B] ring-1 ring-[#F6C62B]'
+                            : 'bg-slate-800/40 border-slate-700 hover:border-slate-500'
+                        }`}
+                        title="Default User Icon"
+                      >
+                        <UserAvatar size="sm" shape="rounded" />
+                      </button>
                       {PRESET_AVATARS.map(av => (
                         <button
+                          type="button"
                           key={av.id}
                           onClick={() => {
                             setProfilePhotoURL(av.url);
@@ -297,7 +314,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                           }`}
                           title={av.label}
                         >
-                          <img src={av.url} alt={av.label} className="w-10 h-10 rounded-md object-cover" />
+                          <img src={av.url} alt={av.label} className="w-8 h-8 rounded-md object-cover mx-auto" />
                         </button>
                       ))}
                     </div>
@@ -311,9 +328,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                         className="flex-1 bg-[#122144] border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#F6C62B]"
                       />
                       <button
+                        type="button"
                         onClick={() => {
                           setShowAvatarPicker(false);
-                          showToast('Custom image URL applied.');
+                          showToast('Avatar selection updated.');
                         }}
                         className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white rounded-lg cursor-pointer"
                       >

@@ -6,7 +6,8 @@
 import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { Hero } from './components/Hero';
-import { SpeedLadder } from './components/SpeedLadder';
+import { LearningPillarsSection } from './components/LearningPillarsSection';
+import { UnderstandSpaceSection } from './components/UnderstandSpaceSection';
 import { HowItWorks } from './components/HowItWorks';
 import { MarketResearch } from './components/MarketResearch';
 import { ExpertDirectory } from './components/ExpertDirectory';
@@ -19,7 +20,6 @@ import { Footer } from './components/Footer';
 import { Dashboard } from './components/Dashboard';
 import { ProfilePage } from './components/ProfilePage';
 import { BookingModal, TrialModal, LoginModal, QuestionModal, ContactModal } from './components/Modals';
-import { ChatbotWidget } from './components/ChatbotWidget';
 import { Expert, ForumPost, DashboardSession, PublicPage } from './types';
 import { EXPERTS_DATA, USER_PAST_SESSIONS, FORUM_POSTS } from './data/mockData';
 import { CheckCircle2, X } from 'lucide-react';
@@ -54,7 +54,7 @@ export interface AuthUser {
 }
 
 export default function App() {
-  // Global Theme state (Light Ivory Studio default, toggleable to Dark Mode)
+  // Global Theme state (Light Alabaster default, toggleable to Dark Mode)
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     try {
       return localStorage.getItem('prolnk_theme') === 'dark';
@@ -80,7 +80,7 @@ export default function App() {
   const parsePageFromHash = (): PublicPage => {
     const hash = window.location.hash.replace(/^#\/?/, '').toLowerCase();
     if (hash === 'how' || hash === 'how-it-works' || hash === 'faq' || hash === 'privacy') return 'how';
-    if (hash === 'experts') return 'experts';
+    if (hash === 'experts' || hash === 'tutoring') return 'experts';
     if (hash === 'community') return 'community';
     if (hash === 'pricing') return 'pricing';
     if (hash === 'about' || hash === 'team') return 'about';
@@ -88,6 +88,11 @@ export default function App() {
   };
 
   const [activePage, setActivePage] = useState<PublicPage>(() => parsePageFromHash());
+  const [assistantTopicPrefill, setAssistantTopicPrefill] = useState<{
+    subject: string;
+    prompt: string;
+    nonce: number;
+  } | null>(null);
 
   useEffect(() => {
     const onHashChange = () => {
@@ -134,7 +139,7 @@ export default function App() {
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [questionModalOpen, setQuestionModalOpen] = useState(false);
-  
+
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const [selectedExpert, setSelectedExpert] = useState<Expert | null>(null);
 
@@ -172,7 +177,6 @@ export default function App() {
 
   // Sync with Firebase Auth and Firestore on mount
   useEffect(() => {
-    // 1. Fetch community posts from Firestore
     getForumPosts()
       .then(posts => {
         if (posts && posts.length > 0) {
@@ -181,8 +185,7 @@ export default function App() {
       })
       .catch(err => handleServiceError(err));
 
-    // 2. Listen to Firebase Auth state (no unauthenticated localStorage bypass)
-    const unsubscribe = onAuthStatusChange(async (firebaseUser) => {
+    const unsubscribe = onAuthStatusChange(async firebaseUser => {
       if (firebaseUser) {
         try {
           const profile = await getUserProfile(firebaseUser.uid);
@@ -190,7 +193,7 @@ export default function App() {
             uid: firebaseUser.uid,
             name: profile?.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Student',
             email: firebaseUser.email || '',
-            photoURL: profile?.photoURL || firebaseUser.photoURL || undefined,
+            photoURL: profile?.photoURL?.trim() || undefined,
             plan: profile?.plan || '3-Day Free Trial',
             daysLeft: 3,
             bio: profile?.bio || 'University student focused on mastering calculus and physics with ProLnk.',
@@ -204,7 +207,6 @@ export default function App() {
           };
           setCurrentUser(user);
 
-          // Fetch sessions from Firestore
           const sessions = await getUserSessions(firebaseUser.uid);
           if (sessions && sessions.length > 0) {
             setUserSessions(sessions);
@@ -231,23 +233,23 @@ export default function App() {
       return;
     }
 
+    const cleanPhoto = photoURL?.trim() || undefined;
     const newUser: AuthUser = {
       uid: activeUid,
       name: name || 'Student',
       email: email,
-      photoURL,
+      photoURL: cleanPhoto,
       plan: '3-Day Free Trial',
       daysLeft: 3
     };
     setCurrentUser(newUser);
 
-    // Persist to Firestore
     try {
       await saveUserProfile({
         id: activeUid,
         name: newUser.name,
         email: newUser.email,
-        photoURL,
+        photoURL: cleanPhoto ?? '',
         plan: newUser.plan,
         role: 'student',
         createdAt: new Date().toISOString()
@@ -257,7 +259,7 @@ export default function App() {
     }
 
     setCurrentView('dashboard');
-    showToast(`Account created! Welcome to your ProLnk Dashboard, ${newUser.name}.`);
+    showToast(`Account created! Welcome to your ProLnk Portal, ${newUser.name}.`);
   };
 
   const handleLoginUser = async (name: string, email: string, uid?: string, photoURL?: string) => {
@@ -267,32 +269,48 @@ export default function App() {
       return;
     }
 
-    const user: AuthUser = {
-      uid: activeUid,
-      name: name || 'Pablo Vettorazzi',
-      email: email,
-      photoURL,
-      plan: '3-Day Free Trial',
-      daysLeft: 3
-    };
-    setCurrentUser(user);
-
-    // Persist / update to Firestore
+    let existingProfile = null;
     try {
-      await saveUserProfile({
-        id: activeUid,
-        name: user.name,
-        email: user.email,
-        photoURL,
-        plan: user.plan,
-        role: 'student',
-        createdAt: new Date().toISOString()
-      });
+      existingProfile = await getUserProfile(activeUid);
     } catch (err) {
       handleServiceError(err);
     }
 
-    // Load sessions from Firestore
+    const resolvedPhoto = photoURL?.trim() || existingProfile?.photoURL?.trim() || undefined;
+    const user: AuthUser = {
+      uid: activeUid,
+      name: existingProfile?.name || name || 'Student',
+      email: email,
+      photoURL: resolvedPhoto,
+      plan: existingProfile?.plan || '3-Day Free Trial',
+      daysLeft: 3,
+      bio: existingProfile?.bio,
+      university: existingProfile?.university,
+      major: existingProfile?.major,
+      semester: existingProfile?.semester,
+      targetSubjects: existingProfile?.targetSubjects,
+      learningGoal: existingProfile?.learningGoal,
+      streakDays: existingProfile?.streakDays ?? 5,
+      xpPoints: existingProfile?.xpPoints ?? 840
+    };
+    setCurrentUser(user);
+
+    if (!existingProfile) {
+      try {
+        await saveUserProfile({
+          id: activeUid,
+          name: user.name,
+          email: user.email,
+          photoURL: resolvedPhoto ?? '',
+          plan: user.plan,
+          role: 'student',
+          createdAt: new Date().toISOString()
+        });
+      } catch (err) {
+        handleServiceError(err);
+      }
+    }
+
     try {
       const sessions = await getUserSessions(activeUid);
       if (sessions && sessions.length > 0) {
@@ -311,7 +329,7 @@ export default function App() {
       uid: 'demo-student-pablo',
       name: 'Pablo Vettorazzi',
       email: 'Pablovettorazzia@hotmail.com',
-      plan: 'Study Pass (Demo)',
+      plan: 'Plus Plan (Demo)',
       daysLeft: 14,
       bio: 'University student focused on mastering multivariable calculus, physics, and computer science on ProLnk.',
       university: 'Universidad del Valle de Guatemala',
@@ -358,7 +376,7 @@ export default function App() {
       topic: details.topic || 'Tutoring Session',
       expertName: details.expertName,
       subject: details.topic || 'General Tutoring',
-      tutorNotes: `Confirmed 1-on-1 session with ${details.expertName}. Meet link sent to your registered email (${currentUser?.email || 'email'}).`,
+      tutorNotes: `Confirmed 1-on-1 session with ${details.expertName}. Meet link sent to your email (${currentUser?.email || 'email'}).`,
       status: 'upcoming',
       time: details.date.includes('·') ? details.date.split('·')[1].trim() : 'Scheduled'
     };
@@ -373,7 +391,7 @@ export default function App() {
       }
     }
 
-    showToast(`Session booked with ${details.expertName} for Q${details.total}! Check your email for room link.`);
+    showToast(`Session booked with ${details.expertName} for Q${details.total}! Check your portal for the room link.`);
   };
 
   const handleSelectPlan = (_planName: string, _price: string) => {
@@ -404,12 +422,12 @@ export default function App() {
     if (currentUser?.uid && auth.currentUser?.uid === currentUser.uid) {
       try {
         await createForumPost(newPost, currentUser.uid);
-        showToast(`Your question "${title.substring(0, 30)}..." in ${category} was posted to the community!`);
+        showToast(`Your question in ${category} was posted to the community!`);
       } catch (err) {
         handleServiceError(err);
       }
     } else {
-      showToast('Preview posted locally! Sign up or log in to publish your question permanently.');
+      showToast('Preview posted locally! Sign in to publish your question permanently.');
     }
   };
 
@@ -440,13 +458,13 @@ export default function App() {
     }
   };
 
-  const scrollToExperts = () => {
-    navigateToPage('experts');
-  };
-
   const handleUpdateProfile = async (updatedData: Partial<AuthUser>) => {
     if (!currentUser) return;
-    const updated: AuthUser = { ...currentUser, ...updatedData };
+    const normalizedPhoto =
+      'photoURL' in updatedData
+        ? updatedData.photoURL?.trim() || undefined
+        : currentUser.photoURL;
+    const updated: AuthUser = { ...currentUser, ...updatedData, photoURL: normalizedPhoto };
     setCurrentUser(updated);
 
     if (currentUser.uid && auth.currentUser?.uid === currentUser.uid) {
@@ -455,7 +473,7 @@ export default function App() {
           id: currentUser.uid,
           name: updated.name,
           email: updated.email,
-          photoURL: updated.photoURL,
+          photoURL: 'photoURL' in updatedData ? updatedData.photoURL?.trim() || '' : updated.photoURL,
           plan: updated.plan,
           role: 'student',
           createdAt: new Date().toISOString(),
@@ -476,7 +494,19 @@ export default function App() {
     showToast('Your profile has been updated successfully!');
   };
 
-  // Dedicated Full-Page Student Profile View (Separate Page with Natural Smooth Scrolling)
+  const handleSelectSubjectFromHero = (prompt: string) => {
+    setAssistantTopicPrefill({
+      subject: 'Subject',
+      prompt,
+      nonce: Date.now()
+    });
+    const el = document.getElementById('asistente');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  // Dedicated Full-Page Student Profile View
   if (currentView === 'profile' && currentUser) {
     return (
       <ProfilePage
@@ -492,8 +522,7 @@ export default function App() {
     );
   }
 
-  // If a student is authenticated / has dashboard open, they CANNOT navigate to the landing page
-  // unless they go to their profile section and click "Cerrar Sesión"!
+  // Authenticated Student Portal Dashboard
   if (currentUser) {
     return (
       <>
@@ -511,7 +540,6 @@ export default function App() {
           onToggleDarkMode={toggleDarkMode}
         />
 
-        {/* Modals in dashboard */}
         <BookingModal
           expert={selectedExpert}
           isOpen={bookingModalOpen}
@@ -519,20 +547,9 @@ export default function App() {
           onBookingConfirmed={handleBookingConfirmed}
         />
 
-        {/* 24/7 AI Tutor Chatbot - Active & Open in Dashboard with Unlimited Questions */}
-        <ChatbotWidget
-          isSubscribed={true}
-          onOpenTrialModal={() => {}}
-          onBookExpert={handleBookExpert}
-          onOpenQuestionModal={() => setQuestionModalOpen(true)}
-          studentName={currentUser.name}
-          initiallyOpen={true}
-        />
-
-        {/* Global Toast */}
         {toastMessage && (
           <div className="fixed bottom-6 right-6 z-50 max-w-md bg-[#0F2249] text-white border border-slate-700/60 p-4 rounded-2xl shadow-2xl flex items-start gap-3 animate-in slide-in-from-bottom-5 duration-200">
-            <CheckCircle2 className="w-5 h-5 text-[#F5C542] shrink-0 mt-0.5" />
+            <CheckCircle2 className="w-5 h-5 text-[#F5C52C] shrink-0 mt-0.5" />
             <div className="flex-1 text-xs sm:text-sm font-medium leading-snug">
               {toastMessage}
             </div>
@@ -548,10 +565,9 @@ export default function App() {
     );
   }
 
-  // Otherwise, render Public Landing Page
+  // Public Multi-Page Editorial Site
   return (
-    <div className="min-h-screen bg-[#FAFAF7] text-slate-900 flex flex-col font-sans selection:bg-[#F5C542]/40 selection:text-slate-950">
-      
+    <div className="min-h-screen bg-[#FAFAF5] text-[#0F2249] flex flex-col font-sans selection:bg-[#F5C52C]/40 selection:text-[#0F2249]">
       {/* Top Header */}
       <Header
         onOpenTrialModal={() => setTrialModalOpen(true)}
@@ -562,49 +578,47 @@ export default function App() {
         isDarkMode={isDarkMode}
         onToggleDarkMode={toggleDarkMode}
         activePage={activePage}
-        onNavigate={(page) => navigateToPage(page)}
+        onNavigate={page => navigateToPage(page)}
       />
 
-      {/* Main Content Pages (Cleanly Separated) */}
+      {/* Separated Public Pages */}
       <main className="flex-1">
         {activePage === 'home' && (
           <>
             <Hero
               onOpenTrialModal={() => setTrialModalOpen(true)}
+              onExploreExperts={() => navigateToPage('experts')}
+              onSelectSubject={handleSelectSubjectFromHero}
+              onScrollToAssistant={() => {
+                document.getElementById('asistente')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+            />
+
+            <LearningPillarsSection onNavigate={navigateToPage} />
+
+            <UnderstandSpaceSection
+              onOpenTrialModal={() => setTrialModalOpen(true)}
+              onExploreHow={() => navigateToPage('how')}
               onBookExpert={handleBookExpert}
-              onEnterDemo={handleEnterDemoPortal}
+              prefilledTopic={assistantTopicPrefill}
               isSubscribed={!!currentUser}
             />
 
-            <SpeedLadder
-              onOpenTrialModal={() => setTrialModalOpen(true)}
-              onExploreExperts={scrollToExperts}
-              onBrowseCommunity={() => navigateToPage('community')}
-            />
-
-            <MarketResearch />
-
-            <CtaBanner
-              onSuccessSubmit={(email) => {
-                setTrialInitialEmail(email);
-                setTrialModalOpen(true);
-              }}
-              onViewPrivacy={() => navigateToPage('how', 'privacy')}
-            />
+            <CtaBanner onOpenTrialModal={() => setTrialModalOpen(true)} />
           </>
         )}
 
         {activePage === 'how' && (
           <>
             <HowItWorks />
-            <FAQ />
-            <CtaBanner
-              onSuccessSubmit={(email) => {
-                setTrialInitialEmail(email);
-                setTrialModalOpen(true);
-              }}
-              onViewPrivacy={() => navigateToPage('how', 'privacy')}
+            <UnderstandSpaceSection
+              onOpenTrialModal={() => setTrialModalOpen(true)}
+              onBookExpert={handleBookExpert}
+              prefilledTopic={assistantTopicPrefill}
+              isSubscribed={!!currentUser}
             />
+            <FAQ />
+            <CtaBanner onOpenTrialModal={() => setTrialModalOpen(true)} />
           </>
         )}
 
@@ -614,13 +628,7 @@ export default function App() {
               onBookExpert={handleBookExpert}
               defaultShowAll={true}
             />
-            <CtaBanner
-              onSuccessSubmit={(email) => {
-                setTrialInitialEmail(email);
-                setTrialModalOpen(true);
-              }}
-              onViewPrivacy={() => navigateToPage('how', 'privacy')}
-            />
+            <CtaBanner onOpenTrialModal={() => setTrialModalOpen(true)} />
           </>
         )}
 
@@ -633,13 +641,7 @@ export default function App() {
               onVotePost={handleVoteQuestion}
               defaultShowAll={true}
             />
-            <CtaBanner
-              onSuccessSubmit={(email) => {
-                setTrialInitialEmail(email);
-                setTrialModalOpen(true);
-              }}
-              onViewPrivacy={() => navigateToPage('how', 'privacy')}
-            />
+            <CtaBanner onOpenTrialModal={() => setTrialModalOpen(true)} />
           </>
         )}
 
@@ -650,6 +652,7 @@ export default function App() {
               onSelectPlan={handleSelectPlan}
             />
             <FAQ />
+            <CtaBanner onOpenTrialModal={() => setTrialModalOpen(true)} />
           </>
         )}
 
@@ -657,18 +660,12 @@ export default function App() {
           <>
             <AboutAndTeam />
             <MarketResearch />
-            <CtaBanner
-              onSuccessSubmit={(email) => {
-                setTrialInitialEmail(email);
-                setTrialModalOpen(true);
-              }}
-              onViewPrivacy={() => navigateToPage('how', 'privacy')}
-            />
+            <CtaBanner onOpenTrialModal={() => setTrialModalOpen(true)} />
           </>
         )}
       </main>
 
-      {/* Footer */}
+      {/* Dark Navy Footer */}
       <Footer
         onOpenTrialModal={() => setTrialModalOpen(true)}
         onOpenContactModal={() => setContactModalOpen(true)}
@@ -712,21 +709,10 @@ export default function App() {
         onClose={() => setContactModalOpen(false)}
       />
 
-      {/* Floating 24/7 AI Tutor Chatbot - 3 Free Questions Limit on Public Pages */}
-      <ChatbotWidget
-        isSubscribed={false}
-        onOpenTrialModal={() => setTrialModalOpen(true)}
-        onOpenLoginModal={() => setLoginModalOpen(true)}
-        onBookExpert={handleBookExpert}
-        onOpenQuestionModal={() => setQuestionModalOpen(true)}
-        onNavigatePage={(page) => navigateToPage(page)}
-        initiallyOpen={false}
-      />
-
       {/* Floating Global Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 max-w-md bg-[#0F2249] text-white border border-slate-700/60 p-4 rounded-2xl shadow-2xl flex items-start gap-3 animate-in slide-in-from-bottom-5 duration-200">
-          <CheckCircle2 className="w-5 h-5 text-[#F5C542] shrink-0 mt-0.5" />
+          <CheckCircle2 className="w-5 h-5 text-[#F5C52C] shrink-0 mt-0.5" />
           <div className="flex-1 text-xs sm:text-sm font-medium leading-snug">
             {toastMessage}
           </div>

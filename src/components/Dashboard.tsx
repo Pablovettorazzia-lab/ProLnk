@@ -4,6 +4,9 @@ import { Expert, ForumPost, ForumComment, DashboardSession, StudyDocumentPayload
 import { EXPERTS_DATA, FORUM_POSTS, USER_PAST_SESSIONS, AI_PRESET_QUESTIONS } from '../data/mockData';
 import { WhiteboardCanvas } from './WhiteboardCanvas';
 import { VerifiedSourcesBar } from './VerifiedSourcesBar';
+import { GoogleChatPanel } from './GoogleChatPanel';
+import { GoogleClassroomPanel } from './GoogleClassroomPanel';
+import { UserAvatar } from './UserAvatar';
 import { readStudyFile, formatFileSize, MAX_STUDY_FILES } from '../utils/studyFiles';
 import {
   Home,
@@ -11,8 +14,6 @@ import {
   Users,
   Calendar,
   FileText,
-  CreditCard,
-  Settings,
   Search,
   Bell,
   LogOut,
@@ -20,7 +21,6 @@ import {
   BookOpen,
   Sparkles,
   Zap,
-  Star,
   ShieldCheck,
   CheckCircle2,
   ThumbsUp,
@@ -38,9 +38,9 @@ import {
   Plus,
   Trash2,
   ArrowUpRight,
+  ArrowUp,
   Award,
   HelpCircle,
-  FileCheck,
   ChevronDown,
   ChevronUp,
   X,
@@ -49,22 +49,19 @@ import {
   VideoOff,
   PanelLeftClose,
   PanelLeftOpen,
-  PanelLeft,
   Menu,
-  ChevronLeft,
   User,
-  Camera,
-  Edit3,
-  Save,
   GraduationCap,
-  School,
-  Trophy,
   Check,
   Sun,
   Moon,
   Paperclip,
   Globe,
-  Upload
+  Upload,
+  BarChart2,
+  FlaskConical,
+  Code2,
+  ArrowRight
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -109,12 +106,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
   isDarkMode,
   onToggleDarkMode
 }) => {
-  const [activeTab, setActiveTab] = useState<'home' | 'ai-chat' | 'tutors' | 'sessions' | 'community' | 'notes' | 'profile' | 'settings'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'ai-chat' | 'tutors' | 'sessions' | 'community' | 'google-chat' | 'google-classroom' | 'notes' | 'profile' | 'settings'>('home');
   const [notesSubTab, setNotesSubTab] = useState<'canvas' | 'downloads'>('canvas');
   const [searchQuery, setSearchQuery] = useState('');
   const [dashboardToast, setDashboardToast] = useState<string | null>(null);
+  const [homeAiPrompt, setHomeAiPrompt] = useState('');
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [plansModalOpen, setPlansModalOpen] = useState(false);
+  const [helpModalOpen, setHelpModalOpen] = useState(false);
 
-  // Profile edit states
+  // Profile state synced from authenticated user
   const [profileName, setProfileName] = useState(user.name || '');
   const [profileBio, setProfileBio] = useState(user.bio || 'Estudiante universitario apasionado por dominar cálculo y materias STEM con apoyo de ProLnk.');
   const [profileUniversity, setProfileUniversity] = useState(user.university || 'Universidad del Valle de Guatemala');
@@ -127,18 +129,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
       ? user.targetSubjects
       : ['Cálculo Multivariable', 'Física II', 'Álgebra Lineal']
   );
-  const [newSubjectInput, setNewSubjectInput] = useState('');
-  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
-  const PRESET_AVATARS = [
-    { id: 'av1', label: 'Estudiante Tech', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80' },
-    { id: 'av2', label: 'Ingeniero', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=250&q=80' },
-    { id: 'av3', label: 'Científica', url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=250&q=80' },
-    { id: 'av4', label: 'Académico', url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=250&q=80' },
-    { id: 'av5', label: 'Matemática', url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=250&q=80' },
-  ];
-  const [profileSubTab, setProfileSubTab] = useState<'info' | 'achievements' | 'preferences'>('info');
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [aiExplanationStyle, setAiExplanationStyle] = useState<'detailed' | 'quick'>('detailed');
 
   // Sync profile state when user prop updates
   useEffect(() => {
@@ -148,43 +138,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
     if (user.major) setProfileMajor(user.major);
     if (user.semester) setProfileSemester(user.semester);
     if (user.learningGoal) setProfileLearningGoal(user.learningGoal);
-    if (user.photoURL) setProfilePhotoURL(user.photoURL);
+    setProfilePhotoURL(user.photoURL || '');
     if (user.targetSubjects) setProfileSubjects(user.targetSubjects);
   }, [user]);
 
-  const handleSaveProfile = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!profileName.trim()) return;
-
-    if (onUpdateProfile) {
-      onUpdateProfile({
-        name: profileName.trim(),
-        bio: profileBio.trim(),
-        university: profileUniversity.trim(),
-        major: profileMajor.trim(),
-        semester: profileSemester.trim(),
-        learningGoal: profileLearningGoal.trim(),
-        photoURL: profilePhotoURL || undefined,
-        targetSubjects: profileSubjects
-      });
-    }
-
-    showDashboardToast('¡Perfil guardado y sincronizado con éxito! 🎉');
+  const _unusedProfileRefs = {
+    profileBio,
+    profileUniversity,
+    profileMajor,
+    profileSemester,
+    profileLearningGoal,
+    profileSubjects
   };
-
-  const handleAddSubject = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newSubjectInput.trim()) return;
-    const clean = newSubjectInput.trim();
-    if (!profileSubjects.includes(clean)) {
-      setProfileSubjects(prev => [...prev, clean]);
-    }
-    setNewSubjectInput('');
-  };
-
-  const handleRemoveSubject = (subj: string) => {
-    setProfileSubjects(prev => prev.filter(s => s !== subj));
-  };
+  void _unusedProfileRefs;
 
   // Collapsible sidebar & portal theme state synced with global theme
   const [localLightTheme, setLocalLightTheme] = useState<boolean>(() => {
@@ -505,15 +471,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
     showDashboardToast('Your question was posted to the Community Board! 🚀');
   };
 
-  const handleSendAiMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if ((!aiInput.trim() && aiStudyDocs.length === 0) || isAiThinking) return;
+  const sendPromptToAi = async (rawPrompt: string) => {
+    if ((!rawPrompt.trim() && aiStudyDocs.length === 0) || isAiThinking) return;
 
     const userText =
-      aiInput.trim() || 'Please summarize and explain the key concepts in my uploaded study materials.';
+      rawPrompt.trim() || 'Please summarize and explain the key concepts in my uploaded study materials.';
     const activeDocs = aiGroundingMode === 'web' ? [] : aiStudyDocs;
     const effectiveMode = activeDocs.length > 0 ? aiGroundingMode : 'web';
-    setAiInput('');
 
     setAiChatMessages(prev => [
       ...prev,
@@ -591,6 +555,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
+  const handleSendAiMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const prompt = aiInput;
+    if ((!prompt.trim() && aiStudyDocs.length === 0) || isAiThinking) return;
+    setAiInput('');
+    await sendPromptToAi(prompt);
+  };
+
+  const handleHomeAiSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const prompt = homeAiPrompt;
+    if (!prompt.trim() && aiStudyDocs.length === 0) {
+      setActiveTab('ai-chat');
+      return;
+    }
+    setHomeAiPrompt('');
+    setActiveTab('ai-chat');
+    await sendPromptToAi(prompt);
+  };
+
   const handleVote = (id: string) => {
     if (onVotePost) {
       onVotePost(id);
@@ -600,153 +584,276 @@ export const Dashboard: React.FC<DashboardProps> = ({
     );
   };
 
+  const navItems: {
+    id: 'home' | 'ai-chat' | 'tutors' | 'sessions' | 'community' | 'google-chat' | 'google-classroom' | 'notes' | 'profile';
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    badge?: string;
+    badgeTone?: 'live' | 'workspace' | 'neutral';
+  }[] = [
+    { id: 'home', label: 'Overview', icon: Home },
+    { id: 'ai-chat', label: 'AI Tutor 24/7', icon: Bot, badge: 'Live', badgeTone: 'live' },
+    { id: 'tutors', label: 'Verified Tutors', icon: Users },
+    { id: 'sessions', label: 'My Sessions', icon: Calendar },
+    { id: 'community', label: 'Community Q&A', icon: MessageSquare },
+    { id: 'google-chat', label: 'Google Chat', icon: MessageSquare, badge: 'Workspace', badgeTone: 'workspace' },
+    { id: 'google-classroom', label: 'Google Classroom', icon: GraduationCap, badge: 'Workspace', badgeTone: 'workspace' },
+    { id: 'notes', label: 'Whiteboard Notes', icon: FileText },
+    { id: 'profile', label: 'My Profile', icon: User, badge: 'You', badgeTone: 'neutral' }
+  ];
+
+  const activeTabLabel = navItems.find(item => item.id === activeTab)?.label || 'Overview';
+  const activeSessionsList = propSessions && propSessions.length > 0 ? propSessions : USER_PAST_SESSIONS;
+  const activePostsList = propPosts && propPosts.length > 0 ? propPosts : communityPosts;
+  const nextSession = activeSessionsList.find(s => s.status === 'upcoming') || activeSessionsList[0];
+
+  const todayFormatted = (() => {
+    const raw = new Date().toLocaleDateString('es-ES', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long'
+    });
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  })();
+
+  const trimmedSearch = searchQuery.trim().toLowerCase();
+  const searchMatches = trimmedSearch
+    ? {
+        tutors: EXPERTS_DATA.filter(
+          e =>
+            e.name.toLowerCase().includes(trimmedSearch) ||
+            e.subjects.some(s => s.toLowerCase().includes(trimmedSearch))
+        ).slice(0, 3),
+        posts: activePostsList
+          .filter(
+            p =>
+              p.title.toLowerCase().includes(trimmedSearch) ||
+              p.category.toLowerCase().includes(trimmedSearch)
+          )
+          .slice(0, 3),
+        tasks: tasks
+          .filter(
+            t =>
+              t.title.toLowerCase().includes(trimmedSearch) ||
+              t.subject.toLowerCase().includes(trimmedSearch)
+          )
+          .slice(0, 3)
+      }
+    : null;
+
+  const recentNotesPreview = [
+    {
+      id: 'note-1',
+      title: 'Derivadas y regla de la cadena',
+      meta: 'Cálculo · Editado hace 2 horas',
+      highlight: false
+    },
+    {
+      id: 'note-2',
+      title: 'Leyes de Newton · ejercicios',
+      meta: 'Física · Editado ayer',
+      highlight: true
+    },
+    {
+      id: 'note-3',
+      title: 'Introducción a Python',
+      meta: 'Programación · Editado el 23 nov.',
+      highlight: false
+    }
+  ];
+
+  const renderBadgeStyle = (tone?: 'live' | 'workspace' | 'neutral', isActive?: boolean) => {
+    if (isActive) {
+      return 'bg-white/15 text-white border border-white/20';
+    }
+    if (tone === 'live') {
+      return 'bg-emerald-50 text-emerald-700 border border-emerald-200/80';
+    }
+    if (tone === 'workspace') {
+      return 'bg-[#EEF2F7] text-[#0F2249] border border-slate-200';
+    }
+    return 'bg-slate-100 text-slate-600 border border-slate-200/80';
+  };
+
   return (
     <>
-      <div className={`${isLightTheme ? 'portal-light bg-[#FAFAF7] text-slate-900' : 'bg-[#070d1c] text-slate-100'} h-screen max-h-screen overflow-hidden flex flex-col md:flex-row antialiased relative`}>
+      <div className={`${isLightTheme ? 'portal-light bg-[#FAFAF5] text-[#0F2249]' : 'bg-[#070d1c] text-slate-100'} h-screen max-h-screen overflow-hidden flex flex-col md:flex-row antialiased relative`}>
       
+      {/* Shared Hidden File Input for Overview & AI Tutor Study Library */}
+      <input
+        ref={aiFileInputRef}
+        type="file"
+        accept=".pdf,.txt,.md,.csv,.png,.jpg,.jpeg,.webp"
+        multiple
+        onChange={handleUploadStudyFiles}
+        className="hidden"
+      />
+
       {/* Mobile Drawer Backdrop */}
       {mobileSidebarOpen && (
         <div
           onClick={() => setMobileSidebarOpen(false)}
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 md:hidden animate-in fade-in"
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 md:hidden animate-in fade-in"
         >
           <div
             onClick={e => e.stopPropagation()}
-            className="w-72 bg-[#0a1329] border-r border-slate-800 h-full p-4 flex flex-col justify-between shadow-2xl animate-in slide-in-from-left duration-200"
+            className="w-72 bg-white border-r border-slate-200 h-full p-5 flex flex-col justify-between shadow-2xl animate-in slide-in-from-left duration-200 overflow-y-auto"
           >
             <div>
-              <div className="p-3 border-b border-slate-800 flex items-center justify-between">
-                <ProLnkLogo size="sm" light={!isLightTheme} />
+              <div className="pb-4 border-b border-slate-200/80 flex items-center justify-between">
+                <div>
+                  <ProLnkLogo size="md" light={!isLightTheme} showWordmark={true} />
+                  <div className="text-[9px] tracking-[0.16em] uppercase font-semibold text-slate-400 mt-1 pl-0.5">
+                    Aprender es conectar
+                  </div>
+                </div>
                 <button
+                  type="button"
                   onClick={() => setMobileSidebarOpen(false)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-[#0F2249] hover:bg-slate-100 cursor-pointer"
                   title="Close menu"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <nav className="p-3 space-y-1.5 text-xs font-medium mt-3">
-                {[
-                  { id: 'home', label: 'Overview', icon: Home, color: 'text-[#F6C62B]' },
-                  { id: 'ai-chat', label: 'AI Tutor 24/7', icon: Bot, color: 'text-[#F6C62B]', badge: 'Live' },
-                  { id: 'tutors', label: 'Verified Tutors', icon: Users, color: 'text-cyan-400' },
-                  { id: 'sessions', label: 'My Sessions', icon: Calendar, color: 'text-purple-400' },
-                  { id: 'community', label: 'Community Q&A', icon: MessageSquare, color: 'text-amber-400' },
-                  { id: 'notes', label: 'Whiteboard Notes', icon: FileText, color: 'text-teal-400' },
-                  { id: 'profile', label: 'My Profile', icon: User, color: 'text-emerald-400', badge: 'You' },
-                ].map(item => (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      if (item.id === 'profile' && onOpenProfile) {
-                        onOpenProfile();
+              <div className="text-[10px] tracking-[0.14em] uppercase font-semibold text-slate-400 px-2 pt-5 pb-2">
+                Tu espacio
+              </div>
+
+              <nav className="space-y-1 text-[13px] font-medium">
+                {navItems.map(item => {
+                  const isActive = activeTab === item.id;
+                  return (
+                    <button
+                      type="button"
+                      key={item.id}
+                      onClick={() => {
+                        if (item.id === 'profile' && onOpenProfile) {
+                          onOpenProfile();
+                          setMobileSidebarOpen(false);
+                          return;
+                        }
+                        setActiveTab(item.id);
                         setMobileSidebarOpen(false);
-                        return;
-                      }
-                      setActiveTab(item.id as any);
-                      setMobileSidebarOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all cursor-pointer ${
-                      activeTab === item.id
-                        ? 'bg-[#0F2249] text-white font-bold border border-[#F6C62B]/40 shadow-sm'
-                        : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <item.icon className={`w-4 h-4 ${item.color}`} />
-                      <span>{item.label}</span>
-                    </div>
-                    {item.badge && (
-                      <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded">
-                        {item.badge}
-                      </span>
-                    )}
-                  </button>
-                ))}
+                      }}
+                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-[#0F2249] text-white font-semibold shadow-sm'
+                          : 'text-slate-600 hover:text-[#0F2249] hover:bg-slate-100'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <item.icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                        <span>{item.label}</span>
+                      </div>
+                      {item.badge && (
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${renderBadgeStyle(item.badgeTone, isActive)}`}>
+                          {item.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </nav>
             </div>
 
-            <div className="p-3 border-t border-slate-800 space-y-3">
-              <div
-                onClick={() => {
-                  if (onOpenProfile) onOpenProfile();
-                  setMobileSidebarOpen(false);
-                }}
-                className="flex items-center gap-3 p-2 rounded-xl bg-[#080f21] border border-slate-800 hover:border-[#F6C62B]/50 cursor-pointer transition-colors"
-                title="View my profile"
-              >
-                {profilePhotoURL ? (
-                  <img src={profilePhotoURL} alt={profileName} className="w-8 h-8 rounded-full object-cover border border-[#F6C62B]/40" />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-[#0F2249] border border-[#F6C62B] text-white font-bold text-xs flex items-center justify-center">
-                    {profileName.split(' ').map(n => n[0]).join('').substring(0, 2) || 'U'}
-                  </div>
-                )}
-                <div className="overflow-hidden flex-1">
-                  <div className="text-xs font-bold text-white truncate">{profileName}</div>
-                  <div className="text-[10px] text-emerald-400">View & edit profile →</div>
+            <div className="pt-4 space-y-3 border-t border-slate-200/80 mt-4">
+              <div className="rounded-2xl bg-[#EEF2F8] border border-slate-200/80 p-4 space-y-2">
+                <div className="text-[9px] tracking-[0.14em] uppercase font-semibold text-slate-500">
+                  Un poco más lejos
                 </div>
+                <div className="font-editorial text-base text-[#0F2249] leading-snug">
+                  Tu próximo gran paso.
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Más preguntas. Más posibilidades.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPlansModalOpen(true);
+                    setMobileSidebarOpen(false);
+                  }}
+                  className="w-full mt-1 py-2 px-3 rounded-lg bg-[#0F2249] hover:bg-[#19346b] text-white text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <span>Descubrir planes</span>
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </button>
               </div>
-              <button
-                onClick={() => {
-                  if (onOpenProfile) onOpenProfile();
-                  setMobileSidebarOpen(false);
-                }}
-                className="w-full py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center justify-center gap-2 border border-slate-700 transition-colors"
-              >
-                <User className="w-3.5 h-3.5 text-[#F6C62B]" />
-                <span>My Student Profile</span>
-              </button>
+
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onOpenProfile) onOpenProfile();
+                    setMobileSidebarOpen(false);
+                  }}
+                  className="flex items-center gap-2.5 text-left cursor-pointer"
+                >
+                  <UserAvatar photoURL={profilePhotoURL} name={profileName} size="sm" />
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-[#0F2249] truncate">{profileName}</div>
+                    <div className="text-[10px] text-slate-500">Mi perfil →</div>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={onLogOut}
+                  className="p-2 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                  title="Log Out"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Left Sidebar - Completely Fixed and Stationary When Scrolling */}
+      {/* Left Sidebar - Fixed Editorial Navigation */}
       <aside
-        className={`hidden md:flex flex-col justify-between bg-[#0a1329] border-r border-slate-800 shrink-0 h-screen sticky top-0 z-30 transition-all duration-300 overflow-y-auto overflow-x-hidden ${
+        className={`hidden md:flex flex-col justify-between bg-white border-r border-slate-200/80 shrink-0 h-screen sticky top-0 z-30 transition-all duration-300 overflow-y-auto overflow-x-hidden ${
           sidebarCollapsed ? 'w-20' : 'w-64'
         }`}
       >
         <div>
-          {/* Logo brand (clean top header without collapse button) */}
-          <div className={`p-4 border-b border-slate-800 flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
+          {/* Logo Header */}
+          <div className={`px-5 pt-6 pb-4 flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'justify-between'}`}>
             {!sidebarCollapsed ? (
-              <div className="flex items-center gap-2">
-                <ProLnkLogo size="sm" light={!isLightTheme} showWordmark={true} />
-                <span className="text-[10px] font-bold bg-[#F6C62B]/20 text-amber-600 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                  Portal
-                </span>
+              <div>
+                <ProLnkLogo size="md" light={!isLightTheme} showWordmark={true} />
+                <div className="text-[9px] tracking-[0.16em] uppercase font-semibold text-slate-400 mt-1.5 pl-0.5">
+                  Aprender es conectar
+                </div>
               </div>
             ) : (
-              <div className="p-1.5 rounded-xl bg-[#080f21] border border-slate-800 flex items-center justify-center shadow-sm">
+              <div className="p-1.5 rounded-xl bg-[#EEF2F7] border border-slate-200 flex items-center justify-center">
                 <ProLnkLogo size="sm" light={!isLightTheme} showWordmark={false} />
               </div>
             )}
           </div>
 
+          {!sidebarCollapsed && (
+            <div className="text-[10px] tracking-[0.14em] uppercase font-semibold text-slate-400 px-6 pt-3 pb-2">
+              Tu espacio
+            </div>
+          )}
+
           {/* Navigation Links */}
-          <nav className={`space-y-1.5 text-xs font-medium ${sidebarCollapsed ? 'p-2' : 'p-3'}`}>
-            {[
-              { id: 'home', label: 'Overview', icon: Home, color: 'text-[#F6C62B]' },
-              { id: 'ai-chat', label: 'AI Tutor 24/7', icon: Bot, color: 'text-[#F6C62B]', badge: 'Live' },
-              { id: 'tutors', label: 'Verified Tutors', icon: Users, color: 'text-cyan-400' },
-              { id: 'sessions', label: 'My Sessions', icon: Calendar, color: 'text-purple-400' },
-              { id: 'community', label: 'Community Q&A', icon: MessageSquare, color: 'text-amber-400' },
-              { id: 'notes', label: 'Whiteboard Notes', icon: FileText, color: 'text-teal-400' },
-              { id: 'profile', label: 'My Profile', icon: User, color: 'text-emerald-400', badge: 'You' },
-            ].map(item => {
+          <nav className={`space-y-1 text-[13px] font-medium ${sidebarCollapsed ? 'p-2 mt-2' : 'px-3 pb-4'}`}>
+            {navItems.map(item => {
               const isActive = activeTab === item.id;
               return (
                 <button
+                  type="button"
                   key={item.id}
                   onClick={() => {
                     if (item.id === 'profile' && onOpenProfile) {
                       onOpenProfile();
                       return;
                     }
-                    setActiveTab(item.id as any);
+                    setActiveTab(item.id);
                   }}
                   title={item.label}
                   className={`w-full flex items-center transition-all cursor-pointer rounded-xl ${
@@ -755,24 +862,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       : 'justify-between px-3.5 py-2.5'
                   } ${
                     isActive
-                      ? 'bg-[#0F2249] text-white font-bold border border-[#F6C62B]/40 shadow-sm'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                      ? 'bg-[#0F2249] text-white font-semibold shadow-sm'
+                      : 'text-slate-600 hover:text-[#0F2249] hover:bg-slate-100'
                   }`}
                 >
                   <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-3'}`}>
-                    <item.icon className={`w-4 h-4 ${item.color} shrink-0`} />
-                    {!sidebarCollapsed && <span>{item.label}</span>}
+                    <item.icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                    {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
                   </div>
 
                   {!sidebarCollapsed && item.badge && (
-                    <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded">
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md shrink-0 ${renderBadgeStyle(item.badgeTone, isActive)}`}>
                       {item.badge}
                     </span>
                   )}
 
-                  {/* Tooltip for collapsed state */}
                   {sidebarCollapsed && (
-                    <div className="absolute left-full ml-2 px-2.5 py-1 bg-[#0a1329] text-white text-[11px] font-semibold rounded-lg border border-slate-700 shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap">
+                    <div className="absolute left-full ml-2 px-2.5 py-1 bg-[#0F2249] text-white text-[11px] font-semibold rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap">
                       {item.label}
                     </div>
                   )}
@@ -782,59 +888,82 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </nav>
         </div>
 
-        {/* Sidebar Footer with Student profile */}
-        <div className={`border-t border-slate-800 ${sidebarCollapsed ? 'p-2' : 'p-4'} space-y-3`}>
+        {/* Sidebar Bottom Promo Card + Support Footer */}
+        <div className={`${sidebarCollapsed ? 'p-2' : 'p-4'} space-y-3`}>
           {!sidebarCollapsed ? (
             <>
-              <div
-                onClick={() => {
-                  if (onOpenProfile) onOpenProfile();
-                }}
-                className="p-3 rounded-xl bg-[#080f21] border border-slate-800 hover:border-[#F6C62B]/50 flex items-center gap-3 cursor-pointer transition-all group"
-                title="Open My Profile"
-              >
-                {profilePhotoURL ? (
-                  <img src={profilePhotoURL} alt={profileName} className="w-9 h-9 rounded-full object-cover shrink-0 border border-[#F6C62B]/50 group-hover:scale-105 transition-transform" />
-                ) : (
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#0F2249] to-[#F6C62B] text-white font-bold flex items-center justify-center text-xs shrink-0 group-hover:scale-105 transition-transform">
-                    {profileName.split(' ').map(n => n[0]).join('') || 'U'}
-                  </div>
-                )}
-                <div className="overflow-hidden flex-1">
-                  <div className={`text-xs font-bold text-white truncate transition-colors ${isLightTheme ? 'group-hover:text-[#0F2249]' : 'group-hover:text-[#F6C62B]'}`}>{profileName}</div>
-                  <div className="text-[10px] text-emerald-400 font-medium">My Student Profile →</div>
+              <div className="rounded-2xl bg-[#EEF2F8] border border-slate-200/80 p-4 space-y-2">
+                <div className="text-[9px] tracking-[0.14em] uppercase font-semibold text-slate-500">
+                  Un poco más lejos
                 </div>
+                <div className="font-editorial text-[17px] text-[#0F2249] leading-snug">
+                  Tu próximo gran paso.
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Más preguntas. Más posibilidades.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setPlansModalOpen(true)}
+                  className="w-full mt-1.5 py-2.5 px-3 rounded-lg bg-[#0F2249] hover:bg-[#19346b] text-white text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-xs"
+                >
+                  <span>Descubrir planes</span>
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </button>
               </div>
 
-              {/* Bottom toggle / collapse button */}
-              <button
-                onClick={toggleSidebar}
-                className="w-full py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white border border-slate-700 text-xs font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
-              >
-                <PanelLeftClose className="w-3.5 h-3.5 text-[#F6C62B]" />
-                <span>Collapse Sidebar</span>
-              </button>
+              <div className="pt-2 border-t border-slate-200/70 space-y-1.5">
+                <button
+                  type="button"
+                  onClick={() => setHelpModalOpen(true)}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-[#0F2249] hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  <HelpCircle className="w-4 h-4 text-slate-400" />
+                  <span>Ayuda y soporte</span>
+                </button>
+
+                <div className="flex items-center justify-between px-2.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={toggleSidebar}
+                    className="text-[11px] text-slate-400 hover:text-[#0F2249] flex items-center gap-1.5 cursor-pointer transition-colors"
+                    title="Colapsar barra lateral"
+                  >
+                    <PanelLeftClose className="w-3.5 h-3.5" />
+                    <span>Colapsar</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onLogOut}
+                    className="text-[11px] text-slate-400 hover:text-rose-600 flex items-center gap-1 cursor-pointer transition-colors"
+                    title="Cerrar sesión"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Salir</span>
+                  </button>
+                </div>
+
+                <div className="px-2.5 pt-1 text-[10px] text-slate-400">
+                  © 2026 ProLnk
+                </div>
+              </div>
             </>
           ) : (
-            <div className="flex flex-col items-center gap-2">
+            <div className="flex flex-col items-center gap-2 border-t border-slate-200/80 pt-3">
               <button
+                type="button"
                 onClick={() => {
                   if (onOpenProfile) onOpenProfile();
                 }}
-                className="p-0.5 rounded-full hover:ring-2 hover:ring-[#F6C62B] transition-all cursor-pointer"
-                title={`My Profile (${profileName})`}
+                className="p-0.5 rounded-full hover:ring-2 hover:ring-[#F5C52C] transition-all cursor-pointer"
+                title={`Mi Perfil (${profileName})`}
               >
-                {profilePhotoURL ? (
-                  <img src={profilePhotoURL} alt={profileName} className="w-9 h-9 rounded-full object-cover border border-[#F6C62B]/50" />
-                ) : (
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#0F2249] to-[#F6C62B] text-white font-bold flex items-center justify-center text-xs">
-                    {profileName.split(' ').map(n => n[0]).join('').substring(0, 2) || 'U'}
-                  </div>
-                )}
+                <UserAvatar photoURL={profilePhotoURL} name={profileName} size="md" />
               </button>
               <button
+                type="button"
                 onClick={toggleSidebar}
-                className="p-2 rounded-xl text-slate-400 hover:text-[#F6C62B] hover:bg-slate-800 transition-colors cursor-pointer"
+                className="p-2 rounded-xl text-slate-400 hover:text-[#0F2249] hover:bg-slate-100 transition-colors cursor-pointer"
                 title="Expand Sidebar"
               >
                 <PanelLeftOpen className="w-4 h-4" />
@@ -844,284 +973,708 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </aside>
 
-      {/* Main Content Area - Scrollable Independently */}
+      {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto overflow-x-hidden">
         
-        {/* Top bar matching mockup */}
-        <header className="h-16 bg-[#0a1329]/90 border-b border-slate-800 px-4 sm:px-6 flex items-center justify-between gap-3 sticky top-0 z-20 backdrop-blur-md shrink-0">
+        {/* Top Header Bar */}
+        <header className="h-16 bg-white/90 border-b border-slate-200/80 px-4 sm:px-8 flex items-center justify-between gap-4 sticky top-0 z-20 backdrop-blur-md shrink-0">
           
-          <div className="flex items-center gap-2 flex-1 max-w-xl">
-            {/* Mobile menu button */}
+          <div className="flex items-center gap-3 min-w-0">
             <button
+              type="button"
               onClick={() => setMobileSidebarOpen(true)}
-              className="md:hidden p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-700 transition-colors cursor-pointer shrink-0"
-              title="Open Menu"
+              className="md:hidden p-2 rounded-xl text-slate-600 hover:text-[#0F2249] hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer shrink-0"
+              title="Abrir menú"
             >
-              <Menu className="w-4 h-4 text-[#F6C62B]" />
+              <Menu className="w-4 h-4" />
             </button>
 
-            {/* Search Input */}
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <div className="flex items-center gap-2 text-xs sm:text-sm truncate">
+              <button
+                type="button"
+                onClick={() => setActiveTab('home')}
+                className="font-bold text-[#0F2249] hover:underline cursor-pointer"
+              >
+                Mi espacio
+              </button>
+              <span className="text-slate-300">/</span>
+              <span className="text-slate-500 font-medium truncate">{activeTabLabel}</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+            {/* Search Input with Live Results Popover */}
+            <div className="relative hidden sm:block w-60 lg:w-72">
+              <Search className="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Search formulas, tutors, questions..."
-                className="w-full bg-[#122144] border border-slate-700/80 rounded-full pl-9 pr-4 py-1.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#F6C62B] transition-colors"
+                placeholder="Buscar apuntes, tutores, preguntas..."
+                className="w-full bg-[#F4F6FA] border border-slate-200/90 rounded-xl pl-9 pr-8 py-2 text-xs text-[#0F2249] placeholder-slate-400 focus:outline-none focus:border-[#0F2249]/40 transition-colors"
               />
-            </div>
-          </div>
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
 
-          <div className="flex items-center gap-2.5">
+              {searchMatches && (
+                <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 space-y-2.5 z-50 text-xs">
+                  {searchMatches.tutors.length === 0 && searchMatches.posts.length === 0 && searchMatches.tasks.length === 0 ? (
+                    <div className="py-3 text-center text-slate-400">
+                      No encontramos resultados para «{searchQuery}».
+                    </div>
+                  ) : (
+                    <>
+                      {searchMatches.tutors.length > 0 && (
+                        <div>
+                          <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 px-2 pb-1">Tutores</div>
+                          {searchMatches.tutors.map(t => (
+                            <button
+                              type="button"
+                              key={t.id}
+                              onClick={() => {
+                                setSearchQuery('');
+                                onBookExpert(t);
+                              }}
+                              className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-100 flex items-center justify-between cursor-pointer"
+                            >
+                              <span className="font-semibold text-[#0F2249]">{t.name}</span>
+                              <span className="text-[11px] text-slate-500">Q{t.hourlyRate}/h</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {searchMatches.posts.length > 0 && (
+                        <div>
+                          <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 px-2 pb-1">Comunidad</div>
+                          {searchMatches.posts.map(p => (
+                            <button
+                              type="button"
+                              key={p.id}
+                              onClick={() => {
+                                setSearchQuery('');
+                                setExpandedDashboardPostId(p.id);
+                                setActiveTab('community');
+                              }}
+                              className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-100 truncate font-medium text-[#0F2249] cursor-pointer"
+                            >
+                              {p.title}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {searchMatches.tasks.length > 0 && (
+                        <div>
+                          <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 px-2 pb-1">Tareas</div>
+                          {searchMatches.tasks.map(tk => (
+                            <button
+                              type="button"
+                              key={tk.id}
+                              onClick={() => {
+                                setSearchQuery('');
+                                handleSolveTaskWithAI(tk.title, tk.subject);
+                              }}
+                              className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-100 truncate font-medium text-[#0F2249] cursor-pointer"
+                            >
+                              {tk.title}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Light / Dark Mode Switch */}
             <button
               type="button"
               onClick={togglePortalTheme}
-              className={`p-2 rounded-full border transition-colors cursor-pointer shrink-0 ${
-                isLightTheme
-                  ? 'border-slate-300 bg-white hover:bg-slate-100 text-[#0F2249]'
-                  : 'border-slate-700/80 bg-[#122144] hover:bg-[#192f5e] text-slate-300 hover:text-white'
-              }`}
-              title={isLightTheme ? 'Switch to Dark Mode' : 'Switch to Light Studio'}
-              aria-label={isLightTheme ? 'Switch to Dark Mode' : 'Switch to Light Studio'}
+              className="p-2 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-100 text-[#0F2249] transition-colors cursor-pointer shrink-0"
+              title={isLightTheme ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'}
+              aria-label={isLightTheme ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'}
             >
-              {isLightTheme ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5 text-[#F6C62B]" />}
+              {isLightTheme ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4 text-[#F5C52C]" />}
             </button>
-            <button
-              onClick={() => setActiveTab('ai-chat')}
-              className="px-3.5 py-1.5 rounded-full bg-[#F6C62B] text-slate-950 font-bold text-xs hover:bg-[#ffd744] transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm shrink-0"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Ask AI Tutor</span>
-            </button>
-            {/* Direct Profile Access */}
-            <button
-              onClick={() => {
-                if (onOpenProfile) onOpenProfile();
-              }}
-              className={`flex items-center gap-2 p-1 pl-2 pr-3 rounded-full border transition-all cursor-pointer shadow-sm hover:scale-102 ${
-                isLightTheme
-                  ? 'border-slate-300 bg-white hover:bg-slate-100 text-slate-900'
-                  : 'border-slate-700/80 bg-[#122144] hover:bg-[#192f5e] text-slate-200'
-              }`}
-              title="My Student Profile"
-            >
-              {profilePhotoURL ? (
-                <img src={profilePhotoURL} alt={profileName} className="w-6 h-6 rounded-full object-cover border border-[#F6C62B]" />
-              ) : (
-                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#0F2249] to-[#F6C62B] text-white font-bold text-[10px] flex items-center justify-center">
-                  {profileName.split(' ').map(n => n[0]).join('').substring(0, 2) || 'U'}
+
+            {/* Notifications Bell */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setNotificationsOpen(prev => !prev);
+                  setAccountMenuOpen(false);
+                }}
+                className="relative p-2 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-100 text-[#0F2249] transition-colors cursor-pointer shrink-0"
+                title="Notificaciones"
+              >
+                <Bell className="w-4 h-4" />
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#F5C52C] ring-2 ring-white"></span>
+              </button>
+
+              {notificationsOpen && (
+                <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white border border-slate-200 rounded-2xl shadow-xl p-4 space-y-3 z-50 text-xs">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span className="font-bold text-[#0F2249]">Notificaciones</span>
+                    <button
+                      type="button"
+                      onClick={() => setNotificationsOpen(false)}
+                      className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNotificationsOpen(false);
+                        setClassroomOpen(true);
+                      }}
+                      className="w-full text-left p-2.5 rounded-xl bg-[#F2F6FB] hover:bg-slate-100 transition-colors cursor-pointer"
+                    >
+                      <div className="font-semibold text-[#0F2249]">Próxima sesión con {nextSession?.expertName || 'Daniela Ríos'}</div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">{nextSession?.topic || 'Cálculo diferencial'} · {nextSession?.time || 'Mañana, 16:00'}</div>
+                    </button>
+                    <div className="p-2.5 rounded-xl bg-[#FAFAF5] border border-slate-200/70">
+                      <div className="font-semibold text-[#0F2249]">{tasks.filter(t => !t.completed).length} tareas pendientes</div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">Plan actual: {user.plan} ({user.daysLeft} días restantes)</div>
+                    </div>
+                  </div>
                 </div>
               )}
-              <span className="text-xs font-semibold hidden sm:inline">{profileName.split(' ')[0]}</span>
-            </button>
+            </div>
+
+            {/* Account Button with Generic User Avatar */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setAccountMenuOpen(prev => !prev);
+                  setNotificationsOpen(false);
+                }}
+                className="flex items-center gap-2.5 pl-1.5 pr-2.5 py-1 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Mi cuenta"
+              >
+                <UserAvatar photoURL={profilePhotoURL} name={profileName} size="sm" />
+                <div className="hidden sm:block text-left leading-tight">
+                  <div className="text-xs font-bold text-[#0F2249]">
+                    {profileName ? profileName.split(' ')[0] : 'Mi cuenta'}
+                  </div>
+                  <div className="text-[10px] text-slate-500 flex items-center gap-0.5">
+                    <span>Estudiante</span>
+                    <ChevronDown className="w-3 h-3" />
+                  </div>
+                </div>
+              </button>
+
+              {accountMenuOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 z-50 text-xs space-y-1">
+                  <div className="px-3 py-2 border-b border-slate-100">
+                    <div className="font-bold text-[#0F2249] truncate">{profileName}</div>
+                    <div className="text-[11px] text-slate-500 truncate">{user.email}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAccountMenuOpen(false);
+                      if (onOpenProfile) onOpenProfile();
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100 text-[#0F2249] font-medium flex items-center gap-2 cursor-pointer"
+                  >
+                    <User className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Mi perfil y foto</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAccountMenuOpen(false);
+                      setPlansModalOpen(true);
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100 text-[#0F2249] font-medium flex items-center gap-2 cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Descubrir planes</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAccountMenuOpen(false);
+                      onLogOut();
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-rose-50 text-rose-600 font-medium flex items-center gap-2 cursor-pointer"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Cerrar sesión</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
-        {/* Tab 1: Home Dashboard Overview (Based on prueba de captura.jpeg) */}
+        {/* Tab 1: Overview (New Warm Alabaster Editorial Portal + Integrated Study Workstation) */}
         {activeTab === 'home' && (
-          <div className="p-6 lg:p-8 space-y-8 max-w-7xl mx-auto w-full">
+          <div className="p-5 sm:p-8 space-y-7 max-w-[1280px] mx-auto w-full">
             
-            {/* Hero Welcome banner */}
-            <div className="portal-hero-banner bg-gradient-to-r from-[#0F2249] via-[#142958] to-[#0d1c3d] border border-[#F6C62B]/30 rounded-2xl p-6 sm:p-8 relative overflow-hidden shadow-xl">
-              <div className="flex flex-wrap items-center gap-2 mb-3">
-                <span className="px-2.5 py-0.5 rounded-full bg-[#F6C62B] text-slate-950 text-[10px] font-extrabold uppercase tracking-wide">
-                  ProLnk Active
-                </span>
-                <span className="text-xs text-slate-300">
-                  3-Day Free Trial ({user.daysLeft} days remaining)
-                </span>
+            {/* Greeting Row */}
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+              <div>
+                <div className="text-[10px] tracking-[0.14em] uppercase font-semibold text-slate-500">
+                  Tu próxima gran idea empieza aquí
+                </div>
+                <h1 className="font-editorial text-3xl sm:text-[2.25rem] text-[#0F2249] tracking-tight mt-1 leading-tight">
+                  Un buen día para entender.
+                </h1>
               </div>
 
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-display">
-                Welcome back, {user.name.split(' ')[0]}!
-              </h1>
-              <p className="mt-2 text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-                Your personal academic command center is ready. Review your active study streak, pending homework deadlines, and upcoming 1-on-1 tutoring sessions.
-              </p>
+              <div className="text-left sm:text-right">
+                <div className="text-xs font-medium text-slate-500">{todayFormatted}</div>
+                <div className="text-[11px] text-slate-400 mt-0.5">Un paso a la vez. A tu ritmo.</div>
+              </div>
+            </div>
 
-              {/* Quick action buttons */}
-              <div className="flex flex-wrap items-center gap-3 mt-6">
-                <button
-                  onClick={() => setActiveTab('ai-chat')}
-                  className="px-4 py-2 rounded-lg bg-[#F6C62B] text-slate-950 font-bold text-xs hover:bg-[#ffd744] transition-colors cursor-pointer flex items-center gap-1.5 shadow"
+            {/* Top Split Grid: PROLNK AI (8 cols) + TU PRÓXIMA SESIÓN (4 cols) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+              
+              {/* Left 8 cols: PROLNK AI Card */}
+              <div className="lg:col-span-8 bg-[#F2F6FB] border border-slate-200/90 rounded-2xl p-6 sm:p-7 relative overflow-hidden flex flex-col justify-between">
+                {/* Subtle Engineering Grid Accent on Right */}
+                <div
+                  className="pointer-events-none absolute inset-y-0 right-0 w-1/2 opacity-70"
+                  style={{
+                    backgroundImage:
+                      'linear-gradient(to right, rgba(15,34,73,0.045) 1px, transparent 1px), linear-gradient(to bottom, rgba(15,34,73,0.045) 1px, transparent 1px)',
+                    backgroundSize: '28px 28px',
+                    maskImage: 'linear-gradient(to left, black, transparent)',
+                    WebkitMaskImage: 'linear-gradient(to left, black, transparent)'
+                  }}
+                />
+
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[10px] tracking-[0.14em] uppercase font-semibold text-slate-500">
+                      ProLnk AI
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white border border-slate-200/90 text-[11px] font-medium text-emerald-700 shadow-2xs">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                      <span>Disponible 24/7</span>
+                    </span>
+                  </div>
+
+                  <h2 className="font-editorial text-2xl sm:text-[1.85rem] text-[#0F2249] mt-4 leading-snug">
+                    ¿En qué te ayudo hoy?
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-500 mt-1.5 max-w-xl leading-relaxed">
+                    De «no puedo» a «ya entendí». Pregunta, sube tus apuntes y vamos paso a paso.
+                  </p>
+                </div>
+
+                {/* Quick Ask Bar */}
+                <form
+                  onSubmit={handleHomeAiSubmit}
+                  className="relative z-10 mt-6 bg-white border border-slate-200 rounded-xl p-1.5 pl-4 flex items-center gap-2 shadow-xs focus-within:border-[#0F2249]/40 transition-colors"
                 >
-                  <Bot className="w-4 h-4" />
-                  <span>Open 24/7 AI Solver</span>
-                </button>
+                  <input
+                    type="text"
+                    value={homeAiPrompt}
+                    onChange={e => setHomeAiPrompt(e.target.value)}
+                    placeholder="Escribe tu pregunta o adjunta tus apuntes..."
+                    className="flex-1 bg-transparent text-xs sm:text-sm text-[#0F2249] placeholder-slate-400 focus:outline-none py-2"
+                  />
+
+                  {aiStudyDocs.length > 0 && (
+                    <span className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-semibold">
+                      <FileText className="w-3 h-3" />
+                      <span>{aiStudyDocs.length}</span>
+                    </span>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => aiFileInputRef.current?.click()}
+                    className="p-2 rounded-lg text-slate-400 hover:text-[#0F2249] hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+                    title="Adjuntar apuntes o PDF"
+                  >
+                    <Paperclip className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="w-9 h-9 rounded-lg bg-[#F5C52C] hover:bg-[#eab921] text-[#0F2249] flex items-center justify-center transition-colors cursor-pointer shrink-0 shadow-2xs"
+                    title="Enviar a ProLnk AI"
+                  >
+                    <ArrowUp className="w-4 h-4 stroke-[2.5]" />
+                  </button>
+                </form>
+              </div>
+
+              {/* Right 4 cols: TU PRÓXIMA SESIÓN Card */}
+              <div className="lg:col-span-4 bg-white border border-slate-200/90 rounded-2xl p-6 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] tracking-[0.14em] uppercase font-semibold text-slate-500">
+                      Tu próxima sesión
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('sessions')}
+                      className="text-xs font-semibold text-[#0F2249] hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>Ver todas</span>
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="flex items-start gap-3.5 mt-5">
+                    <div className="w-14 h-14 rounded-xl bg-[#F3F5F8] border border-slate-200/70 flex flex-col items-center justify-center shrink-0">
+                      <span className="text-[9px] uppercase tracking-wider font-semibold text-slate-500">
+                        {nextSession?.month?.toUpperCase() || 'NOV'}
+                      </span>
+                      <span className="font-editorial text-xl text-[#0F2249] leading-none mt-0.5">
+                        {nextSession?.day || '26'}
+                      </span>
+                    </div>
+
+                    <div className="min-w-0">
+                      <h3 className="font-editorial text-lg text-[#0F2249] leading-snug truncate">
+                        {nextSession?.topic || 'Cálculo diferencial'}
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5 truncate">
+                        Con {nextSession?.expertName || 'Daniela Ríos'} · Tutora verificada
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-xs text-slate-600 mt-5 pt-3 border-t border-slate-100">
+                    <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span>{nextSession?.time || 'Mañana, 16:00 – 17:00'}</span>
+                  </div>
+                </div>
+
                 <button
-                  onClick={() => setActiveTab('tutors')}
-                  className="px-4 py-2 rounded-lg bg-[#080f21] text-white border border-slate-700 hover:bg-slate-800 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+                  type="button"
+                  onClick={() => setClassroomOpen(true)}
+                  className="w-full mt-5 py-2.5 px-4 rounded-xl bg-[#0F2249] hover:bg-[#19346b] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                 >
-                  <Users className="w-4 h-4 text-[#F6C62B]" />
-                  <span>Book Human Expert</span>
-                </button>
-                <button
-                  onClick={() => setActiveTab('notes')}
-                  className="px-4 py-2 rounded-lg bg-[#080f21] text-slate-300 border border-slate-700 hover:text-white hover:bg-slate-800 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
-                >
-                  <FileText className="w-4 h-4 text-emerald-400" />
-                  <span>Whiteboard & Notes</span>
+                  <span>Preparar mi sesión</span>
+                  <ArrowUpRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
 
-            {/* NEW: 4-Column Academic Momentum & Study Streak Bar */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* 4-Column KPI Strip */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <button
+                type="button"
+                onClick={() => setActiveTab('ai-chat')}
+                className="bg-white border border-slate-200/90 hover:border-[#0F2249]/30 rounded-2xl p-5 text-left transition-all cursor-pointer"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-baseline gap-2.5">
+                    <MessageSquare className="w-4 h-4 text-slate-400 self-center shrink-0" />
+                    <span className="font-editorial text-2xl sm:text-3xl text-[#0F2249] font-mono-nums">
+                      {12 + aiChatMessages.filter(m => m.sender === 'user').length}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-400">Esta semana</span>
+                </div>
+                <div className="text-xs text-slate-500 mt-3 font-medium">Preguntas resueltas</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('sessions')}
+                className="bg-white border border-slate-200/90 hover:border-[#0F2249]/30 rounded-2xl p-5 text-left transition-all cursor-pointer"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-baseline gap-2.5">
+                    <Clock className="w-4 h-4 text-slate-400 self-center shrink-0" />
+                    <span className="font-editorial text-2xl sm:text-3xl text-[#0F2249] font-mono-nums">
+                      4 h
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-400">Este mes</span>
+                </div>
+                <div className="text-xs text-slate-500 mt-3 font-medium">Aprendiendo con tutores</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('notes')}
+                className="bg-white border border-slate-200/90 hover:border-[#0F2249]/30 rounded-2xl p-5 text-left transition-all cursor-pointer"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-baseline gap-2.5">
+                    <FileText className="w-4 h-4 text-slate-400 self-center shrink-0" />
+                    <span className="font-editorial text-2xl sm:text-3xl text-[#0F2249] font-mono-nums">
+                      {String(8 + aiStudyDocs.length).padStart(2, '0')}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-400">Tu biblioteca</span>
+                </div>
+                <div className="text-xs text-slate-500 mt-3 font-medium">Apuntes guardados</div>
+              </button>
+
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-5 text-left">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-baseline gap-2.5">
+                    <BarChart2 className="w-4 h-4 text-slate-400 self-center shrink-0" />
+                    <span className="font-editorial text-2xl sm:text-3xl text-[#0F2249] font-mono-nums">
+                      {user.streakDays || 3} días
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-400">¡Sigue así!</span>
+                </div>
+                <div className="text-xs text-slate-500 mt-3 font-medium">Tu racha de aprendizaje</div>
+              </div>
+            </div>
+
+            {/* Middle 2-Column Row: Retoma donde lo dejaste + Avanza en compañía */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               
-              {/* Stat 1: Daily Streak */}
-              <div className="bg-[#0c162e] border border-slate-700/80 rounded-2xl p-5 flex flex-col justify-between hover:border-[#F6C62B]/50 transition-colors">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-slate-400 font-medium">Study Streak</span>
-                  <div className="p-2 rounded-xl bg-amber-500/20 text-[#F6C62B]">
-                    <Flame className="w-4 h-4" />
+              {/* Left Card: Notes & Study Files */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-6 space-y-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-editorial text-xl text-[#0F2249]">Retoma donde lo dejaste.</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Tus apuntes, siempre a mano.</p>
                   </div>
-                </div>
-                <div>
-                  <div className="text-2xl font-extrabold text-white flex items-baseline gap-2 font-mono-nums">
-                    <span>5 Days</span>
-                    <span className="text-xs text-amber-400 font-semibold">Active 🔥</span>
-                  </div>
-                  {/* Weekday indicators */}
-                  <div className="flex items-center gap-1.5 mt-3">
-                    {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, idx) => (
-                      <span
-                        key={idx}
-                        className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                          idx < 5
-                            ? 'bg-[#F6C62B] text-slate-950 shadow-sm'
-                            : 'bg-slate-800 text-slate-500'
-                        }`}
-                      >
-                        {day}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Stat 2: AI Solver Queries */}
-              <div className="bg-[#0c162e] border border-slate-700/80 rounded-2xl p-5 flex flex-col justify-between hover:border-[#F6C62B]/50 transition-colors">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-slate-400 font-medium">AI Problems Solved</span>
-                  <div className="p-2 rounded-xl bg-blue-500/20 text-blue-400">
-                    <Bot className="w-4 h-4" />
-                  </div>
-                </div>
-                <div>
-                  <div className="text-2xl font-extrabold text-white font-mono-nums">
-                    34 <span className="text-xs text-slate-400 font-normal">/ 50 goal</span>
-                  </div>
-                  <div className="w-full bg-slate-800 h-2 rounded-full mt-3 overflow-hidden">
-                    <div className="bg-gradient-to-r from-blue-500 to-[#F6C62B] h-full rounded-full w-[68%]"></div>
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-2">68% of weekly practice target reached</p>
-                </div>
-              </div>
-
-              {/* Stat 3: Study & Tutoring Hours */}
-              <div className="bg-[#0c162e] border border-slate-700/80 rounded-2xl p-5 flex flex-col justify-between hover:border-[#F6C62B]/50 transition-colors">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-slate-400 font-medium">Study & Tutoring Time</span>
-                  <div className="p-2 rounded-xl bg-purple-500/20 text-purple-400">
-                    <Clock className="w-4 h-4" />
-                  </div>
-                </div>
-                <div>
-                  <div className="text-2xl font-extrabold text-white font-mono-nums">
-                    6.8 <span className="text-xs text-slate-400 font-normal">Hours</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold mt-3">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('notes')}
+                    className="text-xs font-semibold text-[#0F2249] hover:underline flex items-center gap-1 cursor-pointer shrink-0"
+                  >
+                    <span>Ver todos</span>
                     <ArrowUpRight className="w-3.5 h-3.5" />
-                    <span>+1.5h vs last week</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-0.5">3 live tutor sessions completed</p>
-                </div>
-              </div>
-
-              {/* Stat 4: Academic Mastery Score */}
-              <div className="bg-[#0c162e] border border-slate-700/80 rounded-2xl p-5 flex flex-col justify-between hover:border-[#F6C62B]/50 transition-colors">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-slate-400 font-medium">Concept Mastery</span>
-                  <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">
-                    <Target className="w-4 h-4" />
-                  </div>
-                </div>
-                <div>
-                  <div className="text-2xl font-extrabold text-white font-mono-nums">
-                    94% <span className="text-xs text-emerald-400 font-semibold">Mastery</span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-3">
-                    <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">
-                      Calculus
-                    </span>
-                    <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 text-[10px] font-bold">
-                      Physics
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-2">Ranked in top 5% of student cohort</p>
-                </div>
-              </div>
-
-            </div>
-
-            {/* NEW: Upcoming Live Tutoring Spotlight Card */}
-            <div className="portal-hero-banner bg-gradient-to-r from-[#0F2249] to-[#0c1a38] border-2 border-[#F6C62B]/60 rounded-2xl p-6 sm:p-7 relative overflow-hidden shadow-2xl">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                
-                <div className="flex items-start gap-4">
-                  <div className="relative">
-                    <div className="w-14 h-14 rounded-2xl bg-amber-500/20 border-2 border-[#F6C62B] text-[#F6C62B] font-bold flex items-center justify-center text-lg shadow-md">
-                      DR
-                    </div>
-                    <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-[#0F2249] animate-pulse"></span>
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2.5">
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-                        Next Live Call Today
-                      </span>
-                      <span className="text-xs text-[#F6C62B] font-semibold font-mono-nums">
-                        6:00 PM - 7:00 PM (In 1h 45m)
-                      </span>
-                    </div>
-
-                    <h3 className="text-lg font-bold text-white font-display">
-                      Calculus: Integration by Parts & Trigonometric Substitution
-                    </h3>
-                    <p className="text-xs text-slate-300">
-                      with <strong>Daniela Ríos</strong> (M.Sc. Mathematics · Rating: 4.98 ★)
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    onClick={() => setClassroomOpen(true)}
-                    className="px-5 py-2.5 rounded-xl bg-[#F6C62B] hover:bg-[#ffd744] text-slate-950 font-extrabold text-xs transition-all shadow-lg flex items-center gap-2 cursor-pointer"
-                  >
-                    <Video className="w-4 h-4" />
-                    <span>Join Virtual Classroom</span>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('sessions')}
-                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
-                  >
-                    <FileText className="w-4 h-4 text-slate-400" />
-                    <span>View Session Notes</span>
                   </button>
                 </div>
 
+                <div className="divide-y divide-slate-100">
+                  {recentNotesPreview.map(note => (
+                    <button
+                      type="button"
+                      key={note.id}
+                      onClick={() => {
+                        setNotesSubTab('downloads');
+                        setActiveTab('notes');
+                      }}
+                      className="w-full py-3.5 first:pt-1 last:pb-1 flex items-center justify-between gap-3 hover:bg-slate-50/80 px-2 -mx-2 rounded-xl transition-colors text-left cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <div
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
+                            note.highlight
+                              ? 'bg-amber-50 border-amber-200/80 text-amber-700'
+                              : 'bg-[#F3F5F8] border-slate-200/70 text-[#0F2249]'
+                          }`}
+                        >
+                          <FileText className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs sm:text-sm font-semibold text-[#0F2249] truncate">
+                            {note.title}
+                          </div>
+                          <div className="text-[11px] text-slate-400 mt-0.5 truncate">{note.meta}</div>
+                        </div>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-[#0F2249] shrink-0 transition-colors" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Right Card: Community Preview */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-6 space-y-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-editorial text-xl text-[#0F2249]">Avanza en compañía.</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Una buena pregunta también conecta.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('community')}
+                    className="text-xs font-semibold text-[#0F2249] hover:underline flex items-center gap-1 cursor-pointer shrink-0"
+                  >
+                    <span>Ir a comunidad</span>
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div className="divide-y divide-slate-100">
+                  {activePostsList.slice(0, 2).map((post, idx) => (
+                    <button
+                      type="button"
+                      key={post.id}
+                      onClick={() => {
+                        setExpandedDashboardPostId(post.id);
+                        setActiveTab('community');
+                      }}
+                      className="w-full py-3.5 first:pt-1 last:pb-1 text-left hover:bg-slate-50/80 px-2 -mx-2 rounded-xl transition-colors cursor-pointer block space-y-1.5"
+                    >
+                      {idx === 0 && (
+                        <span className="inline-block px-2 py-0.5 rounded-md bg-[#EEF2F7] text-[#0F2249] text-[10px] font-bold uppercase tracking-wider">
+                          {post.category}
+                        </span>
+                      )}
+                      <div className="text-xs sm:text-sm font-semibold text-[#0F2249] leading-snug">
+                        {post.title}
+                      </div>
+                      <div className="flex items-center justify-between gap-2 pt-0.5">
+                        <span className="text-[11px] text-slate-400 truncate">
+                          {idx === 0
+                            ? `${post.author} · ${post.timeAgo}`
+                            : `${post.category} · ${post.repliesCount} respuestas · ${post.timeAgo}`}
+                        </span>
+                        {idx === 0 && post.hasExpertAnswer && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/70 text-[11px] font-medium shrink-0">
+                            <Check className="w-3 h-3" />
+                            <span>{Math.max(post.repliesCount, 3)} respuestas de expertos</span>
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
-            {/* NEW: 2-Column Student Workstation Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Bottom Section: Featured Tutors */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="font-editorial text-xl sm:text-2xl text-[#0F2249]">
+                  A veces, necesitas a alguien al otro lado.
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('tutors')}
+                  className="text-xs font-semibold text-[#0F2249] hover:underline flex items-center gap-1 cursor-pointer shrink-0"
+                >
+                  <span>Encontrar mi tutor</span>
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                {EXPERTS_DATA.slice(0, 3).map((exp, idx) => (
+                  <button
+                    type="button"
+                    key={exp.id}
+                    onClick={() => onBookExpert(exp)}
+                    className="bg-white border border-slate-200/90 hover:border-[#0F2249]/35 rounded-2xl p-5 text-left transition-all cursor-pointer flex flex-col justify-between gap-4 shadow-2xs hover:shadow-md"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 border ${
+                            idx === 1
+                              ? 'bg-amber-50 border-amber-200 text-[#0F2249]'
+                              : 'bg-[#F3F5F8] border-slate-200/80 text-[#0F2249]'
+                          }`}
+                        >
+                          {idx === 0 ? (
+                            <span className="font-editorial text-base">±</span>
+                          ) : idx === 1 ? (
+                            <Code2 className="w-4 h-4" />
+                          ) : (
+                            <FlaskConical className="w-4 h-4" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-editorial text-base text-[#0F2249] truncate">
+                            {exp.name}
+                          </div>
+                          <div className="text-[11px] text-slate-500 truncate">
+                            {exp.subjects.slice(0, 2).join(' · ')}
+                          </div>
+                        </div>
+                      </div>
+                      <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-1" />
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                      <span className="inline-flex items-center gap-1.5 text-emerald-700 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        <span>Disponible esta semana</span>
+                      </span>
+                      <span className="font-bold text-[#0F2249] font-mono-nums">
+                        Q{exp.hourlyRate} / hora
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Google Workspace & Interactive Tools Strip */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <button
+                type="button"
+                onClick={() => setActiveTab('google-chat')}
+                className="bg-white border border-slate-200/90 hover:border-[#0F2249]/35 rounded-2xl p-4 flex items-center justify-between gap-3 text-left transition-all cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200/70 text-emerald-700 flex items-center justify-center shrink-0">
+                    <MessageSquare className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-[#0F2249]">Google Chat Workspace</div>
+                    <div className="text-[11px] text-slate-500">Grupos de estudio y mensajes</div>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-slate-400 shrink-0" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('google-classroom')}
+                className="bg-white border border-slate-200/90 hover:border-[#0F2249]/35 rounded-2xl p-4 flex items-center justify-between gap-3 text-left transition-all cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#EEF2F7] border border-slate-200 text-[#0F2249] flex items-center justify-center shrink-0">
+                    <GraduationCap className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-[#0F2249]">Google Classroom</div>
+                    <div className="text-[11px] text-slate-500">Cursos, entregas y anuncios</div>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-slate-400 shrink-0" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setNotesSubTab('canvas');
+                  setActiveTab('notes');
+                }}
+                className="bg-white border border-slate-200/90 hover:border-[#0F2249]/35 rounded-2xl p-4 flex items-center justify-between gap-3 text-left transition-all cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200/70 text-amber-700 flex items-center justify-center shrink-0">
+                    <BookOpen className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-[#0F2249]">Pizarra y Hojas de Fórmulas</div>
+                    <div className="text-[11px] text-slate-500">Dibuja diagramas y descarga guías</div>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-slate-400 shrink-0" />
+              </button>
+            </div>
+
+            {/* Existing Workstation Grid: Assignments Planner + Daily STEM Challenge */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               
-              {/* Left Column (7 cols): Homework & Exam Due Date Tracker */}
-              <div className="lg:col-span-7 bg-[#0c162e] border border-slate-700/80 rounded-2xl p-6 flex flex-col justify-between shadow-xl">
+              {/* Left Column (7 cols): Assignments & Exam Planner */}
+              <div className="lg:col-span-7 bg-[#0c162e] border border-slate-700/80 rounded-2xl p-6 flex flex-col justify-between shadow-sm">
                 <div>
                   <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
                     <div className="flex items-center gap-2.5">
@@ -1130,7 +1683,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       </div>
                       <div>
                         <h3 className="font-bold text-white text-base font-display">
-                          Assignments & Exam Planner
+                          Assignments &amp; Exam Planner
                         </h3>
                         <p className="text-xs text-slate-400">
                           Track deadlines, get instant AI explanations, or request human review.
@@ -1139,6 +1692,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     </div>
 
                     <button
+                      type="button"
                       onClick={() => setShowAddTask(prev => !prev)}
                       className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
@@ -1151,6 +1705,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <div className="flex items-center gap-2 mb-4">
                     {(['all', 'pending', 'completed'] as const).map(filter => (
                       <button
+                        type="button"
                         key={filter}
                         onClick={() => setTaskFilter(filter)}
                         className={`px-3 py-1 rounded-full text-xs font-semibold capitalize transition-colors cursor-pointer ${
@@ -1212,13 +1767,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         <button
                           type="button"
                           onClick={() => setShowAddTask(false)}
-                          className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-semibold hover:text-white"
+                          className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-semibold hover:text-white cursor-pointer"
                         >
                           Cancel
                         </button>
                         <button
                           type="submit"
-                          className="px-4 py-1.5 rounded-lg bg-[#F6C62B] text-slate-950 text-xs font-bold hover:bg-[#ffd744]"
+                          className="px-4 py-1.5 rounded-lg bg-[#F6C62B] text-slate-950 text-xs font-bold hover:bg-[#ffd744] cursor-pointer"
                         >
                           Save Task
                         </button>
@@ -1227,7 +1782,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   )}
 
                   {/* Task Rows */}
-                  <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+                  <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
                     {tasks
                       .filter(t => {
                         if (taskFilter === 'pending') return !t.completed;
@@ -1245,6 +1800,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         >
                           <div className="flex items-start gap-3 flex-1 min-w-0">
                             <button
+                              type="button"
                               onClick={() => toggleTask(task.id)}
                               className="mt-0.5 text-slate-400 hover:text-[#F6C62B] transition-colors cursor-pointer shrink-0"
                             >
@@ -1276,6 +1832,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                           <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
                             <button
+                              type="button"
                               onClick={() => handleSolveTaskWithAI(task.title, task.subject)}
                               className="px-2.5 py-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 text-[11px] font-bold transition-colors flex items-center gap-1 cursor-pointer"
                               title="Solve problem step-by-step with 24/7 AI"
@@ -1284,6 +1841,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                               <span>Solve with AI</span>
                             </button>
                             <button
+                              type="button"
                               onClick={() => handleBookTutorForSubject(task.subject)}
                               className="px-2.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-[#F6C62B] border border-amber-500/30 text-[11px] font-bold transition-colors flex items-center gap-1 cursor-pointer"
                               title="Book a verified human tutor for this subject"
@@ -1292,6 +1850,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                               <span>Book Tutor</span>
                             </button>
                             <button
+                              type="button"
                               onClick={() => deleteTask(task.id)}
                               className="p-1.5 text-slate-500 hover:text-rose-400 transition-colors cursor-pointer rounded-lg hover:bg-slate-800"
                               title="Delete task"
@@ -1312,11 +1871,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </div>
               </div>
 
-              {/* Right Column (5 cols): Daily STEM Challenge + Pinned Guides */}
+              {/* Right Column (5 cols): Daily STEM Challenge + Latest Tutor Notes */}
               <div className="lg:col-span-5 space-y-6">
                 
-                {/* Widget 1: Daily Academic Challenge */}
-                <div className="bg-[#0c162e] border border-slate-700/80 rounded-2xl p-6 shadow-xl space-y-4">
+                {/* Widget 1: Daily STEM Challenge */}
+                <div className="bg-[#0c162e] border border-slate-700/80 rounded-2xl p-6 shadow-sm space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                     <div className="flex items-center gap-2">
                       <div className="p-1.5 rounded-lg bg-amber-500/20 text-[#F6C62B]">
@@ -1336,12 +1895,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <p className="text-xs text-slate-300 font-medium leading-relaxed">
                       Evaluate the indefinite integral using the <strong>LIATE</strong> integration by parts rule:
                     </p>
-                    <div className="text-center font-mono font-bold text-white text-base my-2.5 tracking-wide text-[#F6C62B]">
+                    <div className="text-center font-mono font-bold text-[#F6C62B] text-base my-2.5 tracking-wide">
                       ∫ x · cos(x) dx
                     </div>
                   </div>
 
-                  {/* 3 Interactive Multiple Choice Options */}
                   <div className="space-y-2">
                     {[
                       { id: 'A', text: 'x · sin(x) + cos(x) + C', correct: true },
@@ -1349,6 +1907,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       { id: 'C', text: '-x · sin(x) + cos(x) + C', correct: false }
                     ].map(option => (
                       <button
+                        type="button"
                         key={option.id}
                         onClick={() => handleSelectChallenge(option.id)}
                         className={`w-full p-2.5 rounded-xl border text-xs font-semibold text-left transition-all flex items-center justify-between cursor-pointer ${
@@ -1374,9 +1933,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     ))}
                   </div>
 
-                  {/* Collapsible Step-by-Step AI Breakdown */}
                   <div>
                     <button
+                      type="button"
                       onClick={() => setChallengeRevealed(prev => !prev)}
                       className="text-xs text-[#F6C62B] hover:underline flex items-center gap-1 font-semibold cursor-pointer"
                     >
@@ -1398,141 +1957,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </div>
                 </div>
 
-                {/* Widget 2: Pinned Formula Guides & Canvas Shortcut */}
-                <div className="bg-[#0c162e] border border-slate-700/80 rounded-2xl p-6 shadow-xl space-y-3">
+                {/* Widget 2: Latest Tutor Feedback */}
+                <div className="bg-[#0c162e] border border-slate-700/80 rounded-2xl p-6 shadow-sm space-y-3">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                     <div className="flex items-center gap-2">
-                      <BookOpen className="w-4 h-4 text-[#F6C62B]" />
-                      <h4 className="font-bold text-white text-sm font-display">Pinned Formula Sheets</h4>
+                      <FileText className="w-4 h-4 text-[#F6C62B]" />
+                      <h4 className="font-bold text-white text-sm font-display">Latest Tutor Feedback</h4>
                     </div>
-                    <button
-                      onClick={() => setActiveTab('notes')}
-                      className="text-xs text-[#F6C62B] hover:underline font-semibold"
-                    >
-                      Open Canvas
-                    </button>
+                    <span className="text-[11px] text-slate-400">Daniela Ríos</span>
                   </div>
-
-                  <div className="space-y-2">
-                    <div className="p-2.5 rounded-xl bg-[#080f21] border border-slate-800 flex items-center justify-between text-xs">
-                      <div>
-                        <div className="font-bold text-white">Calculus: Integration by Parts</div>
-                        <div className="text-[10px] text-slate-400">LIATE Hierarchy & Tabular Method</div>
-                      </div>
-                      <button
-                        onClick={() => handleDownloadFormula(
-                          'ProLnk_Calculus_Integration_by_Parts.md',
-                          'Calculus Cheat Sheet',
-                          '# ProLnk Integration by Parts Cheat Sheet\n$$\\int u \\, dv = uv - \\int v \\, du$$\nLIATE: Logarithmic, Inverse trig, Algebraic, Trigonometric, Exponential.'
-                        )}
-                        className="p-1.5 rounded-lg bg-slate-800 text-[#F6C62B] hover:bg-[#F6C62B] hover:text-slate-950 transition-colors"
-                        title="Download"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    <div className="p-2.5 rounded-xl bg-[#080f21] border border-slate-800 flex items-center justify-between text-xs">
-                      <div>
-                        <div className="font-bold text-white">Physics: 2D Collision Vectors</div>
-                        <div className="text-[10px] text-slate-400">Conservation of Linear Momentum</div>
-                      </div>
-                      <button
-                        onClick={() => handleDownloadFormula(
-                          'ProLnk_Physics_2D_Collisions.md',
-                          'Physics 2D Collisions',
-                          '# ProLnk Physics 2D Collisions\n$$m_1 v_{1x} + m_2 v_{2x} = m_1 v\'_{1x} + m_2 v\'_{2x}$$\n$$m_1 v_{1y} + m_2 v_{2y} = m_1 v\'_{1y} + m_2 v\'_{2y}$$'
-                        )}
-                        className="p-1.5 rounded-lg bg-slate-800 text-[#F6C62B] hover:bg-[#F6C62B] hover:text-slate-950 transition-colors"
-                        title="Download"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-
-            </div>
-
-            {/* Grid of Key Features (AI Solver, Tutoring, Community) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              
-              {/* Card 1: 24/7 AI Solver */}
-              <div className="bg-[#0c162e] border border-slate-700/80 rounded-2xl p-6 flex flex-col justify-between hover:border-[#F6C62B]/40 transition-colors">
-                <div>
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-[#F6C62B] flex items-center justify-center mb-4">
-                    <Bot className="w-5 h-5" />
-                  </div>
-                  <h3 className="font-bold text-white text-base font-display">Instant AI Tutor</h3>
-                  <p className="text-xs text-slate-300 mt-2 leading-relaxed">
-                    Ask questions in Calculus, Physics, Chemistry or Essay Writing. AI provides step-by-step logic and citations.
+                  <p className="text-xs text-slate-200 italic leading-relaxed bg-[#080f21] p-3.5 rounded-xl border border-slate-800">
+                    "Redo problems 4 to 9 without the formula sheet, then send me the two that felt slow. Remember LIATE rule for picking u!"
                   </p>
                 </div>
-                <button
-                  onClick={() => setActiveTab('ai-chat')}
-                  className="mt-6 text-xs font-bold text-[#F6C62B] hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <span>Solve homework problem</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
+
               </div>
 
-              {/* Card 2: Upcoming / Recent Sessions */}
-              <div className="bg-[#0c162e] border border-slate-700/80 rounded-2xl p-6 flex flex-col justify-between hover:border-[#F6C62B]/40 transition-colors">
-                <div>
-                  <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-300 flex items-center justify-center mb-4">
-                    <Calendar className="w-5 h-5" />
-                  </div>
-                  <h3 className="font-bold text-white text-base font-display">Tutoring Sessions</h3>
-                  <p className="text-xs text-slate-300 mt-2 leading-relaxed">
-                    3 past sessions with tutor notes on Integration by parts and Thesis rewrite. Rebook with 1 click.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setActiveTab('sessions')}
-                  className="mt-6 text-xs font-bold text-[#F6C62B] hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <span>View session notes</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Card 3: Community Forum */}
-              <div className="bg-[#0c162e] border border-slate-700/80 rounded-2xl p-6 flex flex-col justify-between hover:border-[#F6C62B]/40 transition-colors">
-                <div>
-                  <div className="w-10 h-10 rounded-xl bg-teal-500/20 text-teal-300 flex items-center justify-center mb-4">
-                    <MessageSquare className="w-5 h-5" />
-                  </div>
-                  <h3 className="font-bold text-white text-base font-display">Community Study Feed</h3>
-                  <p className="text-xs text-slate-300 mt-2 leading-relaxed">
-                    Browse questions from other students with verified expert answers. Vote on the clearest explanations.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setActiveTab('community')}
-                  className="mt-6 text-xs font-bold text-[#F6C62B] hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <span>Explore community</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-            </div>
-
-            {/* Notes Callout from Tutors */}
-            <div className="bg-[#0c162e] border border-slate-700/80 rounded-2xl p-6">
-              <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-[#F6C62B]" />
-                  <h3 className="font-bold text-white text-sm">Latest Tutor Feedback & Practice Notes</h3>
-                </div>
-                <span className="text-[11px] text-slate-400">Daniela Ríos · Calculus</span>
-              </div>
-              <p className="text-xs sm:text-sm text-slate-200 italic leading-relaxed bg-[#080f21] p-4 rounded-xl border border-slate-800">
-                "Redo problems 4 to 9 without the formula sheet, then send me the two that felt slow. Remember LIATE rule for picking u!"
-              </p>
             </div>
 
           </div>
@@ -1601,14 +2041,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
               {/* Study Library Drawer (Uploaded PDFs / Notes / Homework Photos) */}
               <div className="px-5 py-2.5 bg-[#080f21]/60 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <input
-                    ref={aiFileInputRef}
-                    type="file"
-                    accept=".pdf,.txt,.md,.csv,.png,.jpg,.jpeg,.webp"
-                    multiple
-                    onChange={handleUploadStudyFiles}
-                    className="hidden"
-                  />
                   <button
                     type="button"
                     onClick={() => aiFileInputRef.current?.click()}
@@ -2193,9 +2625,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           {/* Add Comment Input Form */}
                           <form onSubmit={(e) => handleAddDashboardComment(p.id, e)} className="pt-2">
                             <div className="flex items-start gap-3 bg-[#0c162e] p-3 rounded-xl border border-slate-700 focus-within:border-[#F6C62B] transition-colors">
-                              <div className="w-8 h-8 rounded-full bg-[#0F2249] border border-[#F6C62B]/40 text-[#F6C62B] font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
-                                {user.name.split(' ').map(n => n[0]).join('').substring(0, 2) || 'U'}
-                              </div>
+                              <UserAvatar photoURL={profilePhotoURL} name={user.name} size="sm" className="mt-0.5" />
                               <input
                                 type="text"
                                 required
@@ -2343,6 +2773,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         )}
 
+        {/* Tab 7: Google Chat Workspace Integration */}
+        {activeTab === 'google-chat' && (
+          <GoogleChatPanel onNotify={showDashboardToast} />
+        )}
+
+        {/* Tab 8: Google Classroom Workspace Integration */}
+        {activeTab === 'google-classroom' && (
+          <GoogleClassroomPanel onNotify={showDashboardToast} />
+        )}
+
       </main>
       </div>
 
@@ -2433,13 +2873,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                     <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 to-[#070d1c]">
                       <div className="text-center space-y-2">
-                        {user.photoURL ? (
-                          <img src={user.photoURL} alt={user.name} className="w-14 h-14 rounded-2xl mx-auto object-cover border border-[#F6C62B]/50" />
-                        ) : (
-                          <div className="w-14 h-14 rounded-2xl bg-[#0F2249] border border-[#F6C62B] text-white font-bold text-lg flex items-center justify-center mx-auto shadow-lg">
-                            {user.name.split(' ').map(n => n[0]).join('')}
-                          </div>
-                        )}
+                        <UserAvatar photoURL={user.photoURL} name={user.name} size="lg" shape="rounded" className="mx-auto border border-[#F6C62B]/50" />
                         <span className="text-[11px] text-slate-400 font-medium">
                           {classroomVideoOn ? 'Camera Active' : 'Camera Muted'}
                         </span>
@@ -2604,6 +3038,110 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Plans Discovery Modal */}
+      {plansModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl">
+            <div className="px-6 py-4 bg-[#FAFAF5] border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <div className="text-[10px] tracking-[0.14em] uppercase font-semibold text-slate-500">
+                  Planes ProLnk
+                </div>
+                <h3 className="font-editorial text-xl text-[#0F2249]">Un plan para cada ritmo.</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPlansModalOpen(false)}
+                className="p-1.5 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+              {[
+                { name: 'Starter', price: 'Q120', desc: '1 hora de tutoría + 50 preguntas de IA al mes', accent: false },
+                { name: 'Plus', price: 'Q240', desc: '3 horas de tutoría + IA ilimitada + notas de pizarra', accent: true },
+                { name: 'Unlimited STEM', price: 'Q450', desc: '6 horas de tutoría + IA ilimitada + matching prioritario', accent: false }
+              ].map(p => (
+                <div
+                  key={p.name}
+                  className={`rounded-2xl p-4 border flex flex-col justify-between space-y-4 ${
+                    p.accent ? 'bg-[#0F2249] text-white border-[#0F2249]' : 'bg-[#FAFAF5] text-[#0F2249] border-slate-200'
+                  }`}
+                >
+                  <div>
+                    <div className="font-editorial text-lg">{p.name}</div>
+                    <div className="font-editorial text-2xl mt-2">{p.price}<span className="text-[11px] font-sans opacity-75"> /mes</span></div>
+                    <p className={`text-[11px] mt-2 leading-relaxed ${p.accent ? 'text-slate-300' : 'text-slate-600'}`}>{p.desc}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPlansModalOpen(false);
+                      if (onUpdateProfile) {
+                        onUpdateProfile({ plan: `${p.name} (${p.price}/mes)` });
+                      }
+                      showDashboardToast(`Plan ${p.name} seleccionado en tu portal.`);
+                    }}
+                    className={`w-full py-2 rounded-lg font-bold text-xs cursor-pointer transition-colors ${
+                      p.accent ? 'bg-[#F5C52C] hover:bg-[#eab921] text-[#0F2249]' : 'bg-[#0F2249] hover:bg-[#19346b] text-white'
+                    }`}
+                  >
+                    Elegir {p.name}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Help & Support Modal */}
+      {helpModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <HelpCircle className="w-5 h-5 text-[#0F2249]" />
+                <h3 className="font-editorial text-lg text-[#0F2249]">Ayuda y soporte</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHelpModalOpen(false)}
+                className="p-1.5 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              ¿Necesitas ayuda con tus sesiones, Classroom o apuntes? Puedes consultar a ProLnk AI las 24 horas o abrir una tutoría urgente con un especialista verificado.
+            </p>
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setHelpModalOpen(false);
+                  setActiveTab('ai-chat');
+                }}
+                className="flex-1 py-2.5 rounded-lg bg-[#F5C52C] hover:bg-[#eab921] text-[#0F2249] font-bold text-xs cursor-pointer"
+              >
+                Ir a AI Tutor 24/7
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setHelpModalOpen(false);
+                  setActiveTab('tutors');
+                }}
+                className="flex-1 py-2.5 rounded-lg bg-[#0F2249] hover:bg-[#19346b] text-white font-bold text-xs cursor-pointer"
+              >
+                Buscar tutor
+              </button>
+            </div>
           </div>
         </div>
       )}

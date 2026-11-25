@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, Shield } from 'lucide-react';
+import { Plus, Minus, ChevronDown, Shield } from 'lucide-react';
 
 export const FAQ: React.FC = () => {
   const [openIdx, setOpenIdx] = useState<number | null>(0);
@@ -8,108 +8,125 @@ export const FAQ: React.FC = () => {
 
   const faqs = [
     {
-      q: 'How much does a tutoring session cost?',
-      a: 'A 1-hour private session starts at Q120, an urgent 15-minute connection adds Q25, and the Study Pass is Q319 per month (including 3 live sessions plus 1 priority urgent upgrade). The ProLnk AI assistant and community forum are free.'
+      q: 'What does the 3-day free trial include?',
+      a: 'Full access to 24/7 AI tutoring and a free community question to start exploring ProLnk.'
     },
     {
-      q: 'Which subjects do you cover?',
-      a: 'Physics, Mathematics, and Chemistry are core STEM pillars, alongside Academic Writing, French, Spanish, Computer Science/Python, Economics, and Career Advising.'
+      q: 'Can I upload my own study notes?',
+      a: 'Yes. You can attach PDFs, study guides, text files, or photos of problems so the assistant answers directly from your own class material.'
     },
     {
-      q: 'How does the 3-day free trial work?',
-      a: 'You get 3 full days of unlimited interactive messages with our cited AI assistant with zero payment information required upfront.'
+      q: 'How do I choose my tutor?',
+      a: 'On the Tutoring page, you can filter by subject, review verified credentials, check online availability, and compare hourly rates before booking.'
     },
     {
-      q: 'Can I trust the AI’s answers and calculations?',
-      a: 'Yes. ProLnk AI cites exact textbook sections (OpenStax, Stewart Calculus, Giancoli Physics) behind its formulas. You can also match with a verified tutor in one tap.'
-    },
-    {
-      q: 'How are human tutors verified?',
-      a: 'Every tutor undergoes an academic degree check and a live mock teaching evaluation before onboarding, and student ratings govern rankings.'
+      q: 'What if I need urgent help?',
+      a: 'When booking any tutoring session, you can enable urgent priority (+Q25) to get matched in roughly 15 minutes.'
     }
   ];
 
   return (
-    <section id="faq" className="py-16 md:py-22 bg-[#FAFAF7] border-b border-slate-200/70">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
-        
-        <div className="text-center">
-          <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0F2249]/80">
-            Questions &amp; Answers
+    <section id="faq" className="py-16 md:py-24 bg-[#FAFAF5]">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
+        {/* Section 05 Editorial 2-Column FAQ Split */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
+          {/* Left Title */}
+          <div className="lg:col-span-5 space-y-3">
+            <div className="text-[11px] font-mono-nums uppercase tracking-[0.18em] text-slate-400">
+              05 &nbsp;/&nbsp; BEFORE YOU START
+            </div>
+            <h2
+              className="font-editorial text-[#0F2249]"
+              style={{ fontSize: 'clamp(2rem, 3.6vw, 2.95rem)', lineHeight: 1.12 }}
+            >
+              Good question.
+            </h2>
+            <p className="text-sm text-slate-600 max-w-xs leading-relaxed">
+              We have answers for these doubts too.
+            </p>
           </div>
-          <h2 className="mt-2 text-3xl font-extrabold text-slate-950 tracking-tight">
-            Frequently asked <span className="font-serif-accent text-[#0F2249] font-normal">questions</span>.
-          </h2>
+
+          {/* Right Clean Accordion Rows */}
+          <div className="lg:col-span-7 divide-y divide-slate-200/80 border-t border-b border-slate-200/80">
+            {faqs.map((item, idx) => {
+              const isOpen = openIdx === idx;
+              return (
+                <div key={idx}>
+                  <button
+                    type="button"
+                    onClick={() => setOpenIdx(isOpen ? null : idx)}
+                    className="w-full py-5 text-left flex items-center justify-between gap-4 text-[#0F2249] hover:opacity-80 transition-opacity cursor-pointer"
+                  >
+                    <span className="font-editorial text-lg sm:text-xl font-medium">
+                      {item.q}
+                    </span>
+                    <span className="text-[#0F2249] shrink-0">
+                      {isOpen ? <Minus className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                    </span>
+                  </button>
+
+                  {isOpen && (
+                    <div className="pb-5 pr-8 text-xs sm:text-sm text-slate-600 leading-relaxed">
+                      {item.a}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="space-y-2.5">
-          {faqs.map((item, idx) => {
-            const isOpen = openIdx === idx;
-            return (
-              <div
-                key={idx}
-                className="bg-white border border-slate-300/80 rounded-2xl overflow-hidden transition-colors"
+        {/* Clean Privacy & Academic Integrity Accordion */}
+        <div id="privacy" className="pt-8 border-t border-slate-200/80 max-w-3xl">
+          <div className="flex items-center gap-2 text-[#0F2249] mb-4">
+            <Shield className="w-4 h-4" />
+            <h3 className="text-xs font-mono-nums uppercase tracking-[0.15em] font-bold">
+              Privacy &amp; Academic Integrity
+            </h3>
+          </div>
+
+          <div className="space-y-2.5">
+            <div className="bg-white border border-slate-200/80 rounded-xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setOpenPrivacy(!openPrivacy)}
+                className="w-full p-4 text-left flex items-center justify-between font-semibold text-[#0F2249] text-xs cursor-pointer"
               >
-                <button
-                  type="button"
-                  onClick={() => setOpenIdx(isOpen ? null : idx)}
-                  className="w-full p-4 sm:p-5 text-left flex items-center justify-between gap-4 font-bold text-slate-950 text-sm hover:text-[#0F2249] transition-colors cursor-pointer"
-                >
-                  <span>{item.q}</span>
-                  <ChevronDown
-                    className={`w-4 h-4 text-slate-600 transition-transform duration-200 shrink-0 ${
-                      isOpen ? 'rotate-180 text-[#0F2249]' : ''
-                    }`}
-                  />
-                </button>
+                <span>Privacy Policy</span>
+                <ChevronDown
+                  className={`w-4 h-4 text-slate-500 transition-transform ${
+                    openPrivacy ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+              {openPrivacy && (
+                <div className="px-4 pb-4 text-xs text-slate-600 border-t border-slate-100 pt-3 leading-relaxed">
+                  We collect your email and academic profile strictly to manage your account, tutoring history, and study notes. We never sell student data to third parties. Request account deletion anytime via prolnk.org@gmail.com.
+                </div>
+              )}
+            </div>
 
-                {isOpen && (
-                  <div className="px-4 sm:px-5 pb-5 pt-1 text-xs sm:text-sm text-slate-600 leading-relaxed border-t border-slate-100">
-                    {item.a}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        <div id="privacy" className="pt-6 border-t border-slate-200/80 space-y-2.5">
-          <div className="flex items-center gap-2 text-slate-700 mb-2">
-            <Shield className="w-4 h-4 text-[#0F2249]" />
-            <h3 className="text-sm font-bold">Privacy &amp; Academic Integrity</h3>
-          </div>
-
-          <div className="bg-white border border-slate-300/80 rounded-2xl overflow-hidden">
-            <button
-              onClick={() => setOpenPrivacy(!openPrivacy)}
-              className="w-full p-4 text-left flex items-center justify-between font-semibold text-slate-900 text-xs cursor-pointer"
-            >
-              <span>Privacy Policy</span>
-              <ChevronDown className={`w-4 h-4 text-slate-600 transition-transform ${openPrivacy ? 'rotate-180' : ''}`} />
-            </button>
-            {openPrivacy && (
-              <div className="px-4 pb-4 text-xs text-slate-600 space-y-2 border-t border-slate-100 pt-3">
-                <p>We collect the email address you submit strictly to manage your account, sessions, and trial updates. We never sell student data to third parties. Request data deletion anytime via prolnk.org@gmail.com.</p>
-              </div>
-            )}
-          </div>
-
-          <div className="bg-white border border-slate-300/80 rounded-2xl overflow-hidden">
-            <button
-              onClick={() => setOpenTerms(!openTerms)}
-              className="w-full p-4 text-left flex items-center justify-between font-semibold text-slate-900 text-xs cursor-pointer"
-            >
-              <span>Terms of Use &amp; Academic Integrity</span>
-              <ChevronDown className={`w-4 h-4 text-slate-600 transition-transform ${openTerms ? 'rotate-180' : ''}`} />
-            </button>
-            {openTerms && (
-              <div className="px-4 pb-4 text-xs text-slate-600 space-y-2 border-t border-slate-100 pt-3">
-                <p>ProLnk is strictly a learning and tutoring aid. Students are expected to adhere to their institution’s academic honor code. Prices are in Guatemalan Quetzales (Q).</p>
-              </div>
-            )}
+            <div className="bg-white border border-slate-200/80 rounded-xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setOpenTerms(!openTerms)}
+                className="w-full p-4 text-left flex items-center justify-between font-semibold text-[#0F2249] text-xs cursor-pointer"
+              >
+                <span>Terms of Use &amp; Academic Integrity</span>
+                <ChevronDown
+                  className={`w-4 h-4 text-slate-500 transition-transform ${
+                    openTerms ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+              {openTerms && (
+                <div className="px-4 pb-4 text-xs text-slate-600 border-t border-slate-100 pt-3 leading-relaxed">
+                  ProLnk is a learning and tutoring companion built around step-by-step understanding and clear citations. All prices are listed in Guatemalan Quetzales (Q).
+                </div>
+              )}
+            </div>
           </div>
         </div>
-
       </div>
     </section>
   );

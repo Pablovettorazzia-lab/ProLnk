@@ -10,9 +10,7 @@ interface FooterProps {
 }
 
 export const Footer: React.FC<FooterProps> = ({
-  onOpenTrialModal,
   onOpenContactModal,
-  isDarkMode = false,
   onNavigate
 }) => {
   const go = (page: PublicPage, sectionId?: string) => {
@@ -22,109 +20,93 @@ export const Footer: React.FC<FooterProps> = ({
   };
 
   return (
-    <footer className="bg-[#F3F1EC] border-t border-slate-200 text-slate-600 text-xs">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-        
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-10 pb-12 border-b border-slate-200/90">
-          
-          <div className="md:col-span-2 space-y-4">
+    <footer className="bg-[#0F2249] text-white border-t border-white/10 text-xs">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-14 space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+          {/* Left Brand Block */}
+          <div className="md:col-span-4 space-y-2.5">
             <button
               type="button"
               onClick={() => go('home')}
-              className="inline-block cursor-pointer text-left"
+              className="inline-flex items-center bg-white px-3 py-1.5 rounded-lg cursor-pointer shadow-xs"
               aria-label="ProLnk Home"
             >
-              <ProLnkLogo size="md" light={isDarkMode} />
+              <ProLnkLogo size="sm" light={false} />
             </button>
-            <p className="text-xs text-slate-700 max-w-xs leading-relaxed">
-              Source-cited AI tutoring paired with verified live educators whenever you need help.
+            <p className="text-xs text-slate-300 pt-1">
+              Learning is connecting.
             </p>
           </div>
 
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold text-slate-950 uppercase tracking-wider">Product</h4>
-            <ul className="space-y-2 text-slate-700">
-              <li>
-                <button type="button" onClick={() => go('home', 'speeds')} className="hover:text-[#0F2249] transition-colors cursor-pointer">
-                  Get help
-                </button>
-              </li>
-              <li>
-                <button type="button" onClick={() => go('how')} className="hover:text-[#0F2249] transition-colors cursor-pointer">
-                  How it works
-                </button>
-              </li>
-              <li>
-                <button type="button" onClick={() => go('pricing')} className="hover:text-[#0F2249] transition-colors cursor-pointer">
-                  Pricing
-                </button>
-              </li>
-            </ul>
+          {/* Center Summary & Page Navigation */}
+          <div className="md:col-span-5 space-y-3">
+            <div>
+              <div className="text-xs font-semibold text-white">
+                AI · Tutoring · Community
+              </div>
+              <p className="text-xs text-slate-300 mt-0.5">
+                Real support for your next big step.
+              </p>
+            </div>
+
+            <nav className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-1 text-[11px] text-slate-300">
+              <button
+                type="button"
+                onClick={() => go('how')}
+                className="hover:text-[#F5C52C] transition-colors cursor-pointer"
+              >
+                How it works
+              </button>
+              <button
+                type="button"
+                onClick={() => go('experts')}
+                className="hover:text-[#F5C52C] transition-colors cursor-pointer"
+              >
+                Tutoring
+              </button>
+              <button
+                type="button"
+                onClick={() => go('community')}
+                className="hover:text-[#F5C52C] transition-colors cursor-pointer"
+              >
+                Community
+              </button>
+              <button
+                type="button"
+                onClick={() => go('pricing')}
+                className="hover:text-[#F5C52C] transition-colors cursor-pointer"
+              >
+                Pricing
+              </button>
+              <button
+                type="button"
+                onClick={() => go('about')}
+                className="hover:text-[#F5C52C] transition-colors cursor-pointer"
+              >
+                About
+              </button>
+              <button
+                type="button"
+                onClick={() => go('how', 'privacy')}
+                className="hover:text-[#F5C52C] transition-colors cursor-pointer"
+              >
+                Privacy
+              </button>
+              <button
+                type="button"
+                onClick={onOpenContactModal}
+                className="hover:text-[#F5C52C] transition-colors cursor-pointer"
+              >
+                Contact
+              </button>
+            </nav>
           </div>
 
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold text-slate-950 uppercase tracking-wider">Learn</h4>
-            <ul className="space-y-2 text-slate-700">
-              <li>
-                <button type="button" onClick={() => go('experts')} className="hover:text-[#0F2249] transition-colors cursor-pointer">
-                  Experts
-                </button>
-              </li>
-              <li>
-                <button type="button" onClick={() => go('community')} className="hover:text-[#0F2249] transition-colors cursor-pointer">
-                  Community
-                </button>
-              </li>
-              <li>
-                <button type="button" onClick={() => go('how', 'faq')} className="hover:text-[#0F2249] transition-colors cursor-pointer">
-                  FAQ
-                </button>
-              </li>
-            </ul>
+          {/* Right Copyright */}
+          <div className="md:col-span-3 md:text-right text-xs text-slate-300 font-mono-nums">
+            © 2026 ProLnk
           </div>
-
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold text-slate-950 uppercase tracking-wider">Company</h4>
-            <ul className="space-y-2 text-slate-700">
-              <li>
-                <button type="button" onClick={() => go('about')} className="hover:text-[#0F2249] transition-colors cursor-pointer">
-                  About
-                </button>
-              </li>
-              <li>
-                <button type="button" onClick={onOpenContactModal} className="hover:text-[#0F2249] transition-colors text-left cursor-pointer">
-                  Contact
-                </button>
-              </li>
-              <li>
-                <button type="button" onClick={() => go('about', 'team')} className="hover:text-[#0F2249] transition-colors cursor-pointer">
-                  Team
-                </button>
-              </li>
-              <li>
-                <button type="button" onClick={onOpenTrialModal} className="hover:text-[#0F2249] transition-colors text-left cursor-pointer">
-                  Start free trial
-                </button>
-              </li>
-            </ul>
-          </div>
-
         </div>
-
-        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-600 gap-4">
-          <div>
-            © 2026 ProLnk. All rights reserved. ·{' '}
-            <button
-              type="button"
-              onClick={() => go('how', 'privacy')}
-              className="hover:text-slate-900 underline transition-colors cursor-pointer"
-            >
-              Privacy &amp; terms
-            </button>
-          </div>
-          <div>ProLnk Learning Technologies</div>
-        </div>
-
       </div>
     </footer>
   );
