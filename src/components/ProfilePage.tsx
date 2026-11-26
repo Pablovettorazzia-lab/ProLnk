@@ -364,7 +364,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                       <Users className="w-3.5 h-3.5 text-cyan-400" />
                       <span>1-on-1 Sessions</span>
                     </div>
-                    <div className="text-base font-bold text-white mt-0.5">3 Completed</div>
+                    <div className="text-base font-bold text-white mt-0.5">
+                      {sessionsCount} {sessionsCount === 1 ? 'Session' : 'Sessions'}
+                    </div>
                   </div>
 
                   <div className="p-2.5 rounded-xl bg-[#080f21] border border-slate-800/80">

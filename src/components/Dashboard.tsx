@@ -106,15 +106,49 @@ export const Dashboard: React.FC<DashboardProps> = ({
   isDarkMode,
   onToggleDarkMode
 }) => {
-  const [activeTab, setActiveTab] = useState<'home' | 'ai-chat' | 'tutors' | 'sessions' | 'community' | 'google-chat' | 'google-classroom' | 'notes' | 'profile' | 'settings'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'ai-chat' | 'tutors' | 'sessions' | 'community' | 'google-chat' | 'google-classroom' | 'notes' | 'profile'>('home');
   const [notesSubTab, setNotesSubTab] = useState<'canvas' | 'downloads'>('canvas');
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
   const [dashboardToast, setDashboardToast] = useState<string | null>(null);
   const [homeAiPrompt, setHomeAiPrompt] = useState('');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [plansModalOpen, setPlansModalOpen] = useState(false);
   const [helpModalOpen, setHelpModalOpen] = useState(false);
+  const searchBoxRef = useRef<HTMLDivElement>(null);
+  const notificationsRef = useRef<HTMLDivElement>(null);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (searchBoxRef.current && !searchBoxRef.current.contains(target)) {
+        setSearchDropdownOpen(false);
+      }
+      if (notificationsRef.current && !notificationsRef.current.contains(target)) {
+        setNotificationsOpen(false);
+      }
+      if (accountMenuRef.current && !accountMenuRef.current.contains(target)) {
+        setAccountMenuOpen(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setSearchDropdownOpen(false);
+        setNotificationsOpen(false);
+        setAccountMenuOpen(false);
+        setPlansModalOpen(false);
+        setHelpModalOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
 
   // Profile state synced from authenticated user
   const [profileName, setProfileName] = useState(user.name || '');
@@ -281,6 +315,50 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [classroomOpen, setClassroomOpen] = useState(false);
   const [classroomMicOn, setClassroomMicOn] = useState(true);
   const [classroomVideoOn, setClassroomVideoOn] = useState(true);
+  const [classroomChatInput, setClassroomChatInput] = useState('');
+  const [classroomMessages, setClassroomMessages] = useState<
+    { id: string; sender: 'tutor' | 'student'; author: string; time: string; text: string }[]
+  >([
+    {
+      id: 'cr-1',
+      sender: 'tutor',
+      author: 'Daniela Ríos (Tutor)',
+      time: '6:02 PM',
+      text: `Welcome ${user.name}! I checked your question on the community board. Let's start with equation #14 from Stewart Section 7.2.`
+    },
+    {
+      id: 'cr-2',
+      sender: 'student',
+      author: user.name,
+      time: '6:03 PM',
+      text: 'Great! I got stuck on how the factor of 1/2 distributes into the second integral.'
+    },
+    {
+      id: 'cr-3',
+      sender: 'tutor',
+      author: 'Daniela Ríos (Tutor)',
+      time: '6:04 PM',
+      text: 'Take a look at the blackboard. Because dv = e^(2x) dx, v is (1/2)e^(2x). So the outer 1/2 times the integrated 1/2 gives 1/4!'
+    }
+  ]);
+
+  const handleSendClassroomMessage = () => {
+    const text = classroomChatInput.trim();
+    if (!text) return;
+    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setClassroomMessages(prev => [
+      ...prev,
+      {
+        id: `cr-${Date.now()}`,
+        sender: 'student',
+        author: user.name,
+        time: nowTime,
+        text
+      }
+    ]);
+    setClassroomChatInput('');
+    showDashboardToast('Message sent to Daniela in live room!');
+  };
 
   const toggleTask = (id: string) => {
     setTasks(prev =>
@@ -382,8 +460,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
-  // Community state inside dashboard
-  const [communityPosts, setCommunityPosts] = useState<ForumPost[]>(FORUM_POSTS);
+  // Community state inside dashboard (merged cleanly with propPosts from App/Firestore)
+  const [communityPosts, setCommunityPosts] = useState<ForumPost[]>(() =>
+    propPosts && propPosts.length > 0 ? propPosts : FORUM_POSTS
+  );
+  useEffect(() => {
+    if (!propPosts || propPosts.length === 0) return;
+    setCommunityPosts(prev => {
+      const prevById = new Map(prev.map(p => [p.id, p]));
+      const propIds = new Set(propPosts.map(p => p.id));
+      const mergedFromProps = propPosts.map(pp => {
+        const existing = prevById.get(pp.id);
+        if (!existing) return pp;
+        return {
+          ...pp,
+          comments: existing.comments ?? pp.comments,
+          repliesCount: Math.max(pp.repliesCount, existing.repliesCount)
+        };
+      });
+      const localOnlyPosts = prev.filter(p => !propIds.has(p.id));
+      return [...localOnlyPosts, ...mergedFromProps];
+    });
+  }, [propPosts]);
   const [dashboardCommentInputs, setDashboardCommentInputs] = useState<Record<string, string>>({});
   const [expandedDashboardPostId, setExpandedDashboardPostId] = useState<string | null>('post-1');
   const [forumCategoryFilter, setForumCategoryFilter] = useState('All');
@@ -604,7 +702,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const activeTabLabel = navItems.find(item => item.id === activeTab)?.label || 'Overview';
   const activeSessionsList = propSessions && propSessions.length > 0 ? propSessions : USER_PAST_SESSIONS;
-  const activePostsList = propPosts && propPosts.length > 0 ? propPosts : communityPosts;
+  const activePostsList = communityPosts;
   const nextSession = activeSessionsList.find(s => s.status === 'upcoming') || activeSessionsList[0];
 
   const todayFormatted = (() => {
@@ -856,9 +954,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     setActiveTab(item.id);
                   }}
                   title={item.label}
+                  aria-label={item.label}
                   className={`w-full flex items-center transition-all cursor-pointer rounded-xl ${
                     sidebarCollapsed
-                      ? 'justify-center p-3 relative group'
+                      ? 'justify-center p-3'
                       : 'justify-between px-3.5 py-2.5'
                   } ${
                     isActive
@@ -875,12 +974,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md shrink-0 ${renderBadgeStyle(item.badgeTone, isActive)}`}>
                       {item.badge}
                     </span>
-                  )}
-
-                  {sidebarCollapsed && (
-                    <div className="absolute left-full ml-2 px-2.5 py-1 bg-[#0F2249] text-white text-[11px] font-semibold rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap">
-                      {item.label}
-                    </div>
                   )}
                 </button>
               );
@@ -1004,26 +1097,33 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
             {/* Search Input with Live Results Popover */}
-            <div className="relative hidden sm:block w-60 lg:w-72">
+            <div ref={searchBoxRef} className="relative hidden sm:block w-60 lg:w-72">
               <Search className="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+                onFocus={() => setSearchDropdownOpen(true)}
+                onChange={e => {
+                  setSearchQuery(e.target.value);
+                  setSearchDropdownOpen(true);
+                }}
                 placeholder="Buscar apuntes, tutores, preguntas..."
                 className="w-full bg-[#F4F6FA] border border-slate-200/90 rounded-xl pl-9 pr-8 py-2 text-xs text-[#0F2249] placeholder-slate-400 focus:outline-none focus:border-[#0F2249]/40 transition-colors"
               />
               {searchQuery && (
                 <button
                   type="button"
-                  onClick={() => setSearchQuery('')}
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSearchDropdownOpen(false);
+                  }}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
 
-              {searchMatches && (
+              {searchMatches && searchDropdownOpen && (
                 <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 space-y-2.5 z-50 text-xs">
                   {searchMatches.tutors.length === 0 && searchMatches.posts.length === 0 && searchMatches.tasks.length === 0 ? (
                     <div className="py-3 text-center text-slate-400">
@@ -1105,7 +1205,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </button>
 
             {/* Notifications Bell */}
-            <div className="relative">
+            <div ref={notificationsRef} className="relative">
               <button
                 type="button"
                 onClick={() => {
@@ -1153,7 +1253,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             {/* Account Button with Generic User Avatar */}
-            <div className="relative">
+            <div ref={accountMenuRef} className="relative">
               <button
                 type="button"
                 onClick={() => {
@@ -1287,7 +1387,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     value={homeAiPrompt}
                     onChange={e => setHomeAiPrompt(e.target.value)}
                     placeholder="Escribe tu pregunta o adjunta tus apuntes..."
-                    className="flex-1 bg-transparent text-xs sm:text-sm text-[#0F2249] placeholder-slate-400 focus:outline-none py-2"
+                    className="flex-1 bg-transparent text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none py-2"
                   />
 
                   {aiStudyDocs.length > 0 && (
@@ -2437,7 +2537,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
             {/* Forum Thread Cards List */}
             <div className="space-y-4">
-              {(propPosts && propPosts.length > 0 ? propPosts : communityPosts)
+              {communityPosts
                 .filter(p => {
                   const matchesCat = forumCategoryFilter === 'All' || p.category.toLowerCase().includes(forumCategoryFilter.toLowerCase());
                   const matchesSearch = !forumSearchQuery.trim() ||
@@ -2981,57 +3081,50 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </div>
 
                 <div className="flex-1 p-4 space-y-3 overflow-y-auto text-xs">
-                  <div className="bg-[#0c162e] border border-slate-800 p-2.5 rounded-xl space-y-1">
-                    <div className="flex items-center justify-between text-[10px]">
-                      <span className="font-bold text-amber-400">Daniela Ríos (Tutor)</span>
-                      <span className="text-slate-500">6:02 PM</span>
-                    </div>
-                    <p className="text-slate-200">
-                      Welcome {user.name}! I checked your question on the community board. Let's start with equation #14 from Stewart Section 7.2.
-                    </p>
-                  </div>
-
-                  <div className="bg-[#0F2249] border border-blue-500/30 p-2.5 rounded-xl space-y-1 text-right">
-                    <div className="flex items-center justify-between text-[10px]">
-                      <span className="text-slate-400">6:03 PM</span>
-                      <span className="font-bold text-blue-300">{user.name}</span>
-                    </div>
-                    <p className="text-white text-left">
-                      Great! I got stuck on how the factor of 1/2 distributes into the second integral.
-                    </p>
-                  </div>
-
-                  <div className="bg-[#0c162e] border border-slate-800 p-2.5 rounded-xl space-y-1">
-                    <div className="flex items-center justify-between text-[10px]">
-                      <span className="font-bold text-amber-400">Daniela Ríos (Tutor)</span>
-                      <span className="text-slate-500">6:04 PM</span>
-                    </div>
-                    <p className="text-slate-200">
-                      Take a look at the blackboard. Because dv = e^(2x) dx, v is (1/2)e^(2x). So the outer 1/2 times the integrated 1/2 gives 1/4!
-                    </p>
-                  </div>
+                  {classroomMessages.map(msg =>
+                    msg.sender === 'tutor' ? (
+                      <div key={msg.id} className="bg-[#0c162e] border border-slate-800 p-2.5 rounded-xl space-y-1">
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="font-bold text-amber-400">{msg.author}</span>
+                          <span className="text-slate-500">{msg.time}</span>
+                        </div>
+                        <p className="text-slate-200">{msg.text}</p>
+                      </div>
+                    ) : (
+                      <div key={msg.id} className="bg-[#0F2249] border border-blue-500/30 p-2.5 rounded-xl space-y-1 text-right">
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="text-slate-400">{msg.time}</span>
+                          <span className="font-bold text-blue-300">{msg.author}</span>
+                        </div>
+                        <p className="text-white text-left">{msg.text}</p>
+                      </div>
+                    )
+                  )}
                 </div>
 
                 <div className="p-3 bg-[#080f21] border-t border-slate-800">
-                  <div className="flex items-center gap-2">
+                  <form
+                    onSubmit={e => {
+                      e.preventDefault();
+                      handleSendClassroomMessage();
+                    }}
+                    className="flex items-center gap-2"
+                  >
                     <input
                       type="text"
+                      value={classroomChatInput}
+                      onChange={e => setClassroomChatInput(e.target.value)}
                       placeholder="Type a message to Daniela..."
                       className="flex-1 bg-[#122144] border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#F6C62B]"
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          (e.target as HTMLInputElement).value = '';
-                          showDashboardToast('Message sent to Daniela in live room!');
-                        }
-                      }}
                     />
                     <button
-                      onClick={() => showDashboardToast('Message sent to Daniela in live room!')}
-                      className="p-2 rounded-lg bg-[#F6C62B] text-slate-950 font-bold hover:bg-[#ffd744] transition-colors cursor-pointer"
+                      type="submit"
+                      disabled={!classroomChatInput.trim()}
+                      className="p-2 rounded-lg bg-[#F6C62B] disabled:opacity-50 text-slate-950 font-bold hover:bg-[#ffd744] transition-colors cursor-pointer"
                     >
                       <Send className="w-3.5 h-3.5" />
                     </button>
-                  </div>
+                  </form>
                 </div>
 
               </div>

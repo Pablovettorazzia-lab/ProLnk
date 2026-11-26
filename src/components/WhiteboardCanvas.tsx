@@ -110,25 +110,30 @@ export const WhiteboardCanvas: React.FC = () => {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    const rect = canvas.getBoundingClientRect();
-    drawBackground(ctx, rect.width, rect.height, newStyle);
+    const logicalWidth = canvas.width / 2;
+    const logicalHeight = canvas.height / 2;
+    drawBackground(ctx, logicalWidth, logicalHeight, newStyle);
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    setHistory(prev => [...prev.slice(-15), data]);
   };
 
   const getCoordinates = (e: React.MouseEvent | React.TouchEvent) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
+    const scaleX = rect.width > 0 ? (canvas.width / 2) / rect.width : 1;
+    const scaleY = rect.height > 0 ? (canvas.height / 2) / rect.height : 1;
 
     if ('touches' in e) {
       const touch = e.touches[0];
       return {
-        x: touch.clientX - rect.left,
-        y: touch.clientY - rect.top
+        x: (touch.clientX - rect.left) * scaleX,
+        y: (touch.clientY - rect.top) * scaleY
       };
     } else {
       return {
-        x: (e as React.MouseEvent).clientX - rect.left,
-        y: (e as React.MouseEvent).clientY - rect.top
+        x: ((e as React.MouseEvent).clientX - rect.left) * scaleX,
+        y: ((e as React.MouseEvent).clientY - rect.top) * scaleY
       };
     }
   };
@@ -210,8 +215,7 @@ export const WhiteboardCanvas: React.FC = () => {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    const rect = canvas.getBoundingClientRect();
-    drawBackground(ctx, rect.width, rect.height, bgStyle);
+    drawBackground(ctx, canvas.width / 2, canvas.height / 2, bgStyle);
     const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
     setHistory([data]);
   };
@@ -412,7 +416,7 @@ export const WhiteboardCanvas: React.FC = () => {
           className="w-full h-[460px] cursor-crosshair touch-none"
         />
 
-        <div className="absolute bottom-3 left-4 text-[11px] bg-[#0F2249]/95 text-slate-200 px-2.5 py-1 rounded-md border border-slate-700 pointer-events-none">
+        <div className="absolute bottom-3 left-4 text-[11px] bg-[#0F2249] text-white px-2.5 py-1 rounded-md border border-slate-700 pointer-events-none">
           Draw freely: scratch calculus proofs, physics free-body diagrams, or study notes.
         </div>
       </div>

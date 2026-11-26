@@ -21,6 +21,16 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const [urgentUpgrade, setUrgentUpgrade] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
+  useEffect(() => {
+    if (isOpen) {
+      setDate('Today (Fastest available)');
+      setTime('6:00 PM');
+      setTopic('');
+      setUrgentUpgrade(false);
+      setIsSuccess(false);
+    }
+  }, [isOpen, expert?.id]);
+
   if (!isOpen || !expert) return null;
 
   const basePrice = expert.hourlyRate;
@@ -551,6 +561,12 @@ export const QuestionModal: React.FC<{
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('Physics');
 
+  useEffect(() => {
+    if (isOpen) {
+      setTitle('');
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -629,6 +645,12 @@ export const ContactModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
   onClose
 }) => {
   const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setSubmitted(false);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
