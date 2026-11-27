@@ -77,7 +77,7 @@ service cloud.firestore {
           && data.targetSubjects.size() <= 20
           && (data.targetSubjects.size() == 0 || (data.targetSubjects[0] is string && data.targetSubjects[0].size() <= 80))
         ))
-        && data.createdAt is timestamp
+        && (data.createdAt is timestamp || (data.createdAt is string && data.createdAt.size() <= 40))
         && data.updatedAt is timestamp;
     }
 
@@ -136,6 +136,51 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
+    function isValidAiChatThread(data) {
+      return data.keys().hasAll(['id', 'userId', 'title', 'messageCount', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly([
+          'id', 'userId', 'title', 'previewText', 'messageCount', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && isValidId(data.userId)
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 140
+        && isOptionalString(data, 'previewText', 300)
+        && data.messageCount is int && data.messageCount >= 0 && data.messageCount <= 500
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAiChatMessage(data) {
+      return data.keys().hasAll(['id', 'userId', 'chatId', 'sender', 'text', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly([
+          'id', 'userId', 'chatId', 'sender', 'text', 'isError',
+          'attachedFileNames', 'sources', 'searchQueries', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && isValidId(data.userId)
+        && isValidId(data.chatId)
+        && data.sender is string && data.sender in ['user', 'ai']
+        && data.text is string && data.text.size() >= 1 && data.text.size() <= 12000
+        && isOptionalBool(data, 'isError')
+        && (!('attachedFileNames' in data) || (
+          data.attachedFileNames is list
+          && data.attachedFileNames.size() <= 5
+          && (data.attachedFileNames.size() == 0 || (data.attachedFileNames[0] is string && data.attachedFileNames[0].size() <= 150))
+        ))
+        && (!('sources' in data) || (
+          data.sources is list
+          && data.sources.size() <= 8
+          && (data.sources.size() == 0 || (data.sources[0] is map && data.sources[0].title is string && data.sources[0].title.size() <= 200))
+        ))
+        && (!('searchQueries' in data) || (
+          data.searchQueries is list
+          && data.searchQueries.size() <= 8
+          && (data.searchQueries.size() == 0 || (data.searchQueries[0] is string && data.searchQueries[0].size() <= 200))
+        ))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
     function isValidForumPost(data) {
       return data.keys().hasAll([
           'id', 'title', 'previewText', 'category', 'author',
@@ -158,6 +203,27 @@ service cloud.firestore {
         && isOptionalString(data, 'expertName', 100)
         && isOptionalString(data, 'expertAnswer', 3000)
         && isOptionalString(data, 'timeAgo', 40)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidForumComment(data) {
+      return data.keys().hasAll([
+          'id', 'postId', 'authorId', 'author', 'avatarInitials', 'text', 'upvotes', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'postId', 'authorId', 'author', 'authorRole', 'avatarInitials',
+          'text', 'upvotes', 'timeLabel', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && isValidId(data.postId)
+        && isValidId(data.authorId)
+        && data.author is string && data.author.size() >= 1 && data.author.size() <= 100
+        && (!('authorRole' in data) || (data.authorRole is string && data.authorRole in ['student', 'expert']))
+        && data.avatarInitials is string && data.avatarInitials.size() >= 1 && data.avatarInitials.size() <= 10
+        && data.text is string && data.text.size() >= 1 && data.text.size() <= 2000
+        && data.upvotes is int && data.upvotes >= 0 && data.upvotes <= 100000
+        && isOptionalString(data, 'timeLabel', 40)
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
     }
@@ -279,9 +345,58 @@ service cloud.firestore {
           ]);
         allow delete: if isOwner(userId) && isValidId(userId) && isValidId(sketchId);
       }
+
+      // Private AI Tutor conversation threads (Master Gate enforces existing parent user profile)
+      match /ai_chats/{chatId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(chatId);
+        allow list: if isOwner(userId) && existing().userId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(chatId)
+          && isValidAiChatThread(incoming())
+          && incoming().id == chatId
+          && incoming().userId == userId
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/users/$(userId));
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(chatId)
+          && isValidAiChatThread(incoming())
+          && incoming().id == existing().id
+          && incoming().userId == existing().userId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'title', 'previewText', 'messageCount', 'updatedAt'
+          ]);
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(chatId);
+
+        // Messages inside a user's AI Tutor thread
+        match /messages/{messageId} {
+          allow get: if isOwner(userId) && isValidId(userId) && isValidId(chatId) && isValidId(messageId);
+          allow list: if isOwner(userId) && existing().userId == request.auth.uid && existing().chatId == chatId;
+          allow create: if isOwner(userId)
+            && isValidId(userId)
+            && isValidId(chatId)
+            && isValidId(messageId)
+            && isValidAiChatMessage(incoming())
+            && incoming().id == messageId
+            && incoming().userId == userId
+            && incoming().chatId == chatId
+            && incoming().createdAt == request.time
+            && incoming().updatedAt == request.time
+            && (
+              exists(/databases/$(database)/documents/users/$(userId)/ai_chats/$(chatId))
+              || existsAfter(/databases/$(database)/documents/users/$(userId)/ai_chats/$(chatId))
+            );
+          allow update: if false;
+          allow delete: if isOwner(userId) && isValidId(userId) && isValidId(chatId) && isValidId(messageId);
+        }
+      }
     }
 
-    // Public community forum posts with strict author and upvote validation
+    // Public community forum posts with strict author, reply counter, and upvote validation
     match /forum_posts/{postId} {
       allow get: if isValidId(postId);
       allow list: if existing().createdAt > timestamp.date(1970, 1, 1)
@@ -315,10 +430,64 @@ service cloud.firestore {
             incoming().diff(existing()).affectedKeys().hasOnly(['votes', 'updatedAt'])
             && (incoming().votes == existing().votes + 1 || incoming().votes == existing().votes - 1)
           )
+          ||
+          // Action 3: Authenticated reply counter increment (+1) when posting a comment
+          (
+            incoming().diff(existing()).affectedKeys().hasOnly(['repliesCount', 'updatedAt'])
+            && incoming().repliesCount == existing().repliesCount + 1
+          )
         );
       allow delete: if isSignedIn()
         && isValidId(postId)
         && existing().authorId == request.auth.uid;
+
+      // Community comments / replies inside a forum question
+      match /comments/{commentId} {
+        allow get: if isValidId(postId) && isValidId(commentId);
+        allow list: if isValidId(postId)
+          && existing().createdAt > timestamp.date(1970, 1, 1)
+          && request.query.limit <= 100;
+        allow create: if isSignedIn()
+          && isValidId(postId)
+          && isValidId(commentId)
+          && isValidForumComment(incoming())
+          && incoming().id == commentId
+          && incoming().postId == postId
+          && incoming().authorId == request.auth.uid
+          && incoming().upvotes == 1
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && (
+            exists(/databases/$(database)/documents/forum_posts/$(postId))
+            || existsAfter(/databases/$(database)/documents/forum_posts/$(postId))
+          );
+        allow update: if isSignedIn()
+          && isValidId(postId)
+          && isValidId(commentId)
+          && isValidForumComment(incoming())
+          && incoming().id == existing().id
+          && incoming().postId == existing().postId
+          && incoming().authorId == existing().authorId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (
+            // Action 1: Comment author edits text
+            (
+              existing().authorId == request.auth.uid
+              && incoming().diff(existing()).affectedKeys().hasOnly(['text', 'updatedAt'])
+            )
+            ||
+            // Action 2: Authenticated upvote/unvote (+/- 1)
+            (
+              incoming().diff(existing()).affectedKeys().hasOnly(['upvotes', 'updatedAt'])
+              && (incoming().upvotes == existing().upvotes + 1 || incoming().upvotes == existing().upvotes - 1)
+            )
+          );
+        allow delete: if isSignedIn()
+          && isValidId(postId)
+          && isValidId(commentId)
+          && existing().authorId == request.auth.uid;
+      }
     }
   }
 }

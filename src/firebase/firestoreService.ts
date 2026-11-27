@@ -10,11 +10,20 @@ import {
   orderBy,
   limit,
   updateDoc,
+  writeBatch,
   serverTimestamp,
   Timestamp
 } from 'firebase/firestore';
 import { db, auth } from './config';
-import { ForumPost, DashboardSession, UserTask, SavedSketch } from '../types';
+import {
+  ForumPost,
+  ForumComment,
+  DashboardSession,
+  UserTask,
+  SavedSketch,
+  AiChatThread,
+  AiChatMessage
+} from '../types';
 import { FORUM_POSTS } from '../data/mockData';
 
 export enum OperationType {
@@ -367,7 +376,7 @@ export const updateUserSessionMeet = async (
 export const updateUserSessionStatus = async (
   uid: string,
   sessionId: string,
-  status: 'completed' | 'upcoming',
+  status: 'completed' | 'upcoming' | 'cancelled',
   tutorNotes?: string
 ): Promise<void> => {
   if (!auth.currentUser || auth.currentUser.uid !== uid) {
@@ -382,6 +391,33 @@ export const updateUserSessionStatus = async (
       sanitizeData({
         status,
         tutorNotes: clampString(tutorNotes, 1000),
+        updatedAt: serverTimestamp()
+      })
+    );
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, path);
+  }
+};
+
+export const updateUserSessionSchedule = async (
+  uid: string,
+  sessionId: string,
+  schedule: { date: string; day: string; month: string; time: string }
+): Promise<void> => {
+  if (!auth.currentUser || auth.currentUser.uid !== uid) {
+    return;
+  }
+
+  const path = `users/${uid}/sessions/${sessionId}`;
+  const sessionRef = doc(db, 'users', uid, 'sessions', sessionId);
+  try {
+    await updateDoc(
+      sessionRef,
+      sanitizeData({
+        date: clampString(schedule.date, 80) || 'Scheduled',
+        day: clampString(schedule.day, 20),
+        month: clampString(schedule.month, 20),
+        time: clampString(schedule.time, 40),
         updatedAt: serverTimestamp()
       })
     );
@@ -576,6 +612,303 @@ export const updatePostVotes = async (postId: string, delta: 1 | -1): Promise<vo
     });
   } catch (err) {
     handleFirestoreError(err, OperationType.UPDATE, path);
+  }
+};
+
+export const getForumPostComments = async (postId: string): Promise<ForumComment[]> => {
+  const path = `forum_posts/${postId}/comments`;
+  try {
+    const commentsRef = collection(db, 'forum_posts', postId, 'comments');
+    const q = query(
+      commentsRef,
+      where('createdAt', '>', Timestamp.fromMillis(0)),
+      orderBy('createdAt', 'asc'),
+      limit(100)
+    );
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      return snap.docs.map(d => {
+        const data = d.data();
+        return {
+          id: d.id,
+          postId: data.postId,
+          authorId: data.authorId,
+          author: data.author || 'Student',
+          authorRole: data.authorRole === 'expert' ? 'expert' : 'student',
+          avatarInitials: data.avatarInitials || 'ST',
+          text: data.text || '',
+          timestamp: data.timeLabel || 'Just now',
+          upvotes: typeof data.upvotes === 'number' ? data.upvotes : 1
+        };
+      });
+    }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, path);
+  }
+  return [];
+};
+
+export const addForumPostComment = async (
+  post: ForumPost,
+  comment: ForumComment,
+  uid: string
+): Promise<void> => {
+  if (!auth.currentUser || auth.currentUser.uid !== uid) {
+    return;
+  }
+
+  const postPath = `forum_posts/${post.id}`;
+  const commentPath = `forum_posts/${post.id}/comments/${comment.id}`;
+  const postRef = doc(db, 'forum_posts', post.id);
+  const commentRef = doc(db, 'forum_posts', post.id, 'comments', comment.id);
+
+  let currentRepliesCount = typeof post.repliesCount === 'number' ? post.repliesCount : 0;
+  try {
+    const postSnap = await getDoc(postRef);
+    if (!postSnap.exists()) {
+      await setDoc(
+        postRef,
+        sanitizeData({
+          id: clampString(post.id, 128) || post.id,
+          title: clampString(post.title, 300) || 'Discussion Thread',
+          previewText: clampString(post.previewText, 2000) || 'Community study question',
+          category: clampString(post.category, 60) || 'General',
+          author: clampString(post.author, 100) || 'Student',
+          authorId: uid,
+          votes: 1,
+          repliesCount: 0,
+          hasExpertAnswer: false,
+          timeAgo: clampString(post.timeAgo, 40) || 'Just now',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        })
+      );
+      currentRepliesCount = 0;
+    } else {
+      const existingCount = postSnap.data()?.repliesCount;
+      currentRepliesCount = typeof existingCount === 'number' ? existingCount : 0;
+    }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, postPath);
+  }
+
+  const batch = writeBatch(db);
+  batch.set(
+    commentRef,
+    sanitizeData({
+      id: clampString(comment.id, 128) || `c-${Date.now()}`,
+      postId: post.id,
+      authorId: uid,
+      author: clampString(comment.author, 100) || 'Student',
+      authorRole: comment.authorRole === 'expert' ? 'expert' : 'student',
+      avatarInitials: clampString(comment.avatarInitials, 10) || 'ST',
+      text: clampString(comment.text, 2000) || '',
+      upvotes: 1,
+      timeLabel: clampString(comment.timestamp, 40) || 'Just now',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    })
+  );
+  batch.update(postRef, {
+    repliesCount: currentRepliesCount + 1,
+    updatedAt: serverTimestamp()
+  });
+
+  try {
+    await batch.commit();
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, commentPath);
+  }
+};
+
+export const toggleForumCommentVote = async (
+  postId: string,
+  commentId: string,
+  delta: 1 | -1
+): Promise<void> => {
+  if (!auth.currentUser) {
+    return;
+  }
+
+  const path = `forum_posts/${postId}/comments/${commentId}`;
+  const commentRef = doc(db, 'forum_posts', postId, 'comments', commentId);
+  try {
+    const snap = await getDoc(commentRef);
+    if (!snap.exists()) return;
+    const current = typeof snap.data()?.upvotes === 'number' ? snap.data().upvotes : 0;
+    const nextUpvotes = delta > 0 ? current + 1 : Math.max(0, current - 1);
+    if (nextUpvotes === current) return;
+    await updateDoc(commentRef, {
+      upvotes: nextUpvotes,
+      updatedAt: serverTimestamp()
+    });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, path);
+  }
+};
+
+// AI Tutor Chat History
+export const getUserAiChatThreads = async (uid: string): Promise<AiChatThread[]> => {
+  if (!auth.currentUser || auth.currentUser.uid !== uid) {
+    return [];
+  }
+
+  const path = `users/${uid}/ai_chats`;
+  try {
+    const ref = collection(db, 'users', uid, 'ai_chats');
+    const q = query(ref, where('userId', '==', uid));
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      return snap.docs
+        .map(d => {
+          const data = d.data();
+          return {
+            id: d.id,
+            userId: data.userId,
+            title: data.title || 'AI Study Session',
+            previewText: data.previewText || '',
+            messageCount: typeof data.messageCount === 'number' ? data.messageCount : 0,
+            createdAt: toIsoString(data.createdAt),
+            updatedAt: toIsoString(data.updatedAt)
+          };
+        })
+        .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+    }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, path);
+  }
+  return [];
+};
+
+export const getAiChatMessages = async (uid: string, chatId: string): Promise<AiChatMessage[]> => {
+  if (!auth.currentUser || auth.currentUser.uid !== uid) {
+    return [];
+  }
+
+  const path = `users/${uid}/ai_chats/${chatId}/messages`;
+  try {
+    const ref = collection(db, 'users', uid, 'ai_chats', chatId, 'messages');
+    const q = query(ref, where('userId', '==', uid), where('chatId', '==', chatId));
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      return snap.docs
+        .map(d => {
+          const data = d.data();
+          return {
+            id: d.id,
+            chatId: data.chatId,
+            sender: data.sender === 'user' ? ('user' as const) : ('ai' as const),
+            text: data.text || '',
+            isError: Boolean(data.isError),
+            attachedFileNames: Array.isArray(data.attachedFileNames) ? data.attachedFileNames : undefined,
+            sources: Array.isArray(data.sources) ? data.sources : undefined,
+            searchQueries: Array.isArray(data.searchQueries) ? data.searchQueries : undefined,
+            createdAt: toIsoString(data.createdAt)
+          };
+        })
+        .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+    }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, path);
+  }
+  return [];
+};
+
+export const saveAiChatMessage = async (
+  uid: string,
+  chatId: string,
+  threadTitle: string,
+  message: AiChatMessage,
+  nextMessageCount: number,
+  isNewThread: boolean
+): Promise<void> => {
+  if (!auth.currentUser || auth.currentUser.uid !== uid) {
+    return;
+  }
+
+  const threadPath = `users/${uid}/ai_chats/${chatId}`;
+  const threadRef = doc(db, 'users', uid, 'ai_chats', chatId);
+  const messageRef = doc(db, 'users', uid, 'ai_chats', chatId, 'messages', message.id);
+
+  const boundedFiles = Array.isArray(message.attachedFileNames)
+    ? message.attachedFileNames.filter(Boolean).slice(0, 5).map(n => n.slice(0, 150))
+    : undefined;
+  const boundedSources = Array.isArray(message.sources)
+    ? message.sources
+        .filter(s => s && typeof s.title === 'string' && s.title.trim().length > 0)
+        .slice(0, 8)
+        .map(s => ({
+          title: s.title.trim().slice(0, 200),
+          ...(s.uri ? { uri: String(s.uri).slice(0, 500) } : {}),
+          type: s.type || 'web'
+        }))
+    : undefined;
+  const boundedQueries = Array.isArray(message.searchQueries)
+    ? message.searchQueries.filter(Boolean).slice(0, 8).map(q => q.slice(0, 200))
+    : undefined;
+
+  const cleanMessage = sanitizeData({
+    id: clampString(message.id, 128) || `msg-${Date.now()}`,
+    userId: uid,
+    chatId,
+    sender: message.sender,
+    text: clampString(message.text, 12000) || '...',
+    isError: Boolean(message.isError),
+    attachedFileNames: boundedFiles,
+    sources: boundedSources,
+    searchQueries: boundedQueries,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+
+  const batch = writeBatch(db);
+  if (isNewThread) {
+    batch.set(
+      threadRef,
+      sanitizeData({
+        id: chatId,
+        userId: uid,
+        title: clampString(threadTitle, 140) || 'AI Study Session',
+        previewText: clampString(message.text, 300) || '',
+        messageCount: Math.max(1, Math.min(500, Math.round(nextMessageCount))),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      })
+    );
+  } else {
+    batch.update(
+      threadRef,
+      sanitizeData({
+        previewText: clampString(message.text, 300) || '',
+        messageCount: Math.max(1, Math.min(500, Math.round(nextMessageCount))),
+        updatedAt: serverTimestamp()
+      })
+    );
+  }
+  batch.set(messageRef, cleanMessage);
+
+  try {
+    await batch.commit();
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, threadPath);
+  }
+};
+
+export const deleteUserAiChatThread = async (uid: string, chatId: string): Promise<void> => {
+  if (!auth.currentUser || auth.currentUser.uid !== uid) {
+    return;
+  }
+
+  const path = `users/${uid}/ai_chats/${chatId}`;
+  try {
+    const msgsRef = collection(db, 'users', uid, 'ai_chats', chatId, 'messages');
+    const snap = await getDocs(query(msgsRef, where('userId', '==', uid), where('chatId', '==', chatId)));
+    const batch = writeBatch(db);
+    snap.docs.forEach(d => batch.delete(d.ref));
+    batch.delete(doc(db, 'users', uid, 'ai_chats', chatId));
+    await batch.commit();
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, path);
   }
 };
 

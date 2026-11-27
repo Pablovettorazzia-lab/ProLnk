@@ -111,6 +111,59 @@
         "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp" }
       },
       "required": ["id", "userId", "title", "dataUrl", "createdAt", "updatedAt"]
+    },
+    "AiChatThread": {
+      "title": "AiChatThread",
+      "description": "Saved AI Tutor conversation thread owned by a user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$", "description": "Chat thread ID" },
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$", "description": "Owner user UID" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 140, "description": "Conversation title" },
+        "previewText": { "type": "string", "maxLength": 300, "description": "Short preview of latest message" },
+        "messageCount": { "type": "number", "description": "Number of messages in this thread" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp" }
+      },
+      "required": ["id", "userId", "title", "messageCount", "createdAt", "updatedAt"]
+    },
+    "AiChatMessage": {
+      "title": "AiChatMessage",
+      "description": "Individual message inside a user's saved AI Tutor chat thread",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$", "description": "Message ID" },
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$", "description": "Owner user UID" },
+        "chatId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$", "description": "Parent chat thread ID" },
+        "sender": { "type": "string", "enum": ["user", "ai"], "description": "Message sender" },
+        "text": { "type": "string", "minLength": 1, "maxLength": 12000, "description": "Message text content" },
+        "isError": { "type": "boolean", "description": "Whether this message was an error notice" },
+        "attachedFileNames": { "type": "array", "description": "Up to 5 attached study file names" },
+        "sources": { "type": "array", "description": "Up to 8 verified grounding sources" },
+        "searchQueries": { "type": "array", "description": "Up to 8 grounding search queries" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp" }
+      },
+      "required": ["id", "userId", "chatId", "sender", "text", "createdAt", "updatedAt"]
+    },
+    "ForumComment": {
+      "title": "ForumComment",
+      "description": "Reply or solution comment posted inside a community forum question",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$", "description": "Comment ID" },
+        "postId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$", "description": "Parent forum post ID" },
+        "authorId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$", "description": "Author user UID" },
+        "author": { "type": "string", "minLength": 1, "maxLength": 100, "description": "Author display name" },
+        "authorRole": { "type": "string", "enum": ["student", "expert"], "description": "Author role badge" },
+        "avatarInitials": { "type": "string", "minLength": 1, "maxLength": 10, "description": "Initials shown in thread avatar" },
+        "text": { "type": "string", "minLength": 1, "maxLength": 2000, "description": "Comment text" },
+        "upvotes": { "type": "number", "description": "Number of comment upvotes" },
+        "timeLabel": { "type": "string", "maxLength": 40, "description": "Display timestamp label" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp" }
+      },
+      "required": ["id", "postId", "authorId", "author", "avatarInitials", "text", "upvotes", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
@@ -130,9 +183,21 @@
       "schema": "UserSketch",
       "description": "User private whiteboard drawings and notes"
     },
+    "/users/{userId}/ai_chats/{chatId}": {
+      "schema": "AiChatThread",
+      "description": "User private saved AI Tutor conversation threads"
+    },
+    "/users/{userId}/ai_chats/{chatId}/messages/{messageId}": {
+      "schema": "AiChatMessage",
+      "description": "Messages inside a user's AI Tutor conversation thread"
+    },
     "/forum_posts/{postId}": {
       "schema": "ForumPost",
       "description": "Public community forum questions and expert answers"
+    },
+    "/forum_posts/{postId}/comments/{commentId}": {
+      "schema": "ForumComment",
+      "description": "Community replies and step-by-step solutions on forum posts"
     }
   }
 }

@@ -67,14 +67,14 @@ export const SpeedLadder: React.FC<SpeedLadderProps> = ({
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-12">
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0F2249]/80">
+            <div className="font-kicker text-[#0F2249]/75">
               Four ways to get unstuck
             </div>
-            <h2 className="mt-2 text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight">
-              Pick the <span className="font-serif-accent text-[#0F2249] font-normal">speed</span> you need.
+            <h2 className="mt-2 font-editorial text-3xl sm:text-[2.65rem] text-slate-950">
+              Pick the <span className="font-serif-accent text-[#0F2249]">speed</span> you need.
             </h2>
           </div>
-          <p className="text-sm text-slate-600 max-w-md">
+          <p className="font-subtitle text-sm text-slate-600 max-w-md">
             Start free with cited AI, or step up to a live specialist only when you want personal coaching.
           </p>
         </div>
@@ -103,7 +103,7 @@ export const SpeedLadder: React.FC<SpeedLadderProps> = ({
                     <Icon className="w-5 h-5" />
                   </div>
 
-                  <h3 className={`text-lg font-bold ${item.featured ? 'text-white' : 'text-slate-950'}`}>
+                  <h3 className={`font-editorial text-xl sm:text-2xl ${item.featured ? 'text-white' : 'text-slate-950'}`}>
                     {item.title}
                   </h3>
                   <p className={`mt-2 text-xs sm:text-sm leading-relaxed ${item.featured ? 'text-slate-200' : 'text-slate-700'}`}>

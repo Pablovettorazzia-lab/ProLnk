@@ -67,6 +67,8 @@ export interface Expert {
 
 export interface ForumComment {
   id: string;
+  postId?: string;
+  authorId?: string;
   author: string;
   authorRole?: 'student' | 'expert';
   avatarInitials: string;
@@ -80,6 +82,7 @@ export interface ForumPost {
   id: string;
   title: string;
   author: string;
+  authorId?: string;
   category: string;
   repliesCount: number;
   votes: number;
@@ -101,7 +104,7 @@ export interface DashboardSession {
   expertName: string;
   subject: string;
   tutorNotes: string;
-  status: 'completed' | 'upcoming';
+  status: 'completed' | 'upcoming' | 'cancelled';
   time?: string;
   urgentUsed?: boolean;
   meetUri?: string;
@@ -133,6 +136,29 @@ export interface ChatMessage {
   groundingMode?: 'web' | 'document' | 'hybrid';
   confidence?: string;
   recommendedExpertId?: string;
+}
+
+export interface AiChatThread {
+  id: string;
+  userId?: string;
+  title: string;
+  previewText?: string;
+  messageCount: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AiChatMessage {
+  id: string;
+  chatId?: string;
+  sender: 'user' | 'ai';
+  text: string;
+  isError?: boolean;
+  sources?: VerifiedSource[];
+  searchQueries?: string[];
+  webGroundingSkipped?: boolean;
+  attachedFileNames?: string[];
+  createdAt?: string;
 }
 
 export interface TeamMember {

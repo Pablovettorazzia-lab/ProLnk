@@ -332,7 +332,7 @@ export const GoogleMeetPanel: React.FC<GoogleMeetPanelProps> = ({ onNotify }) =>
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold">
             Integración oficial Google Workspace
           </span>
-          <h2 className="text-xl sm:text-2xl font-bold text-white font-display">
+          <h2 className="font-editorial text-2xl sm:text-3xl text-white">
             Conecta Google Meet para tus tutorías en vivo
           </h2>
           <p className="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto leading-relaxed">
@@ -406,7 +406,7 @@ export const GoogleMeetPanel: React.FC<GoogleMeetPanelProps> = ({ onNotify }) =>
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-sm sm:text-base font-bold text-white font-display">
+              <h2 className="font-editorial text-lg sm:text-xl text-white">
                 Google Meet en vivo
               </h2>
               <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
@@ -488,7 +488,7 @@ export const GoogleMeetPanel: React.FC<GoogleMeetPanelProps> = ({ onNotify }) =>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Plus className="w-4 h-4 text-[#F6C62B]" />
-                <h3 className="text-sm font-bold text-white font-display">
+                <h3 className="font-sans text-sm font-semibold text-white">
                   Crear nueva sala de Google Meet
                 </h3>
               </div>
@@ -565,7 +565,7 @@ export const GoogleMeetPanel: React.FC<GoogleMeetPanelProps> = ({ onNotify }) =>
           <div className="bg-[#0a1329] border border-slate-800 rounded-2xl p-5 space-y-3">
             <div className="flex items-center gap-2">
               <Search className="w-4 h-4 text-[#F6C62B]" />
-              <h3 className="text-sm font-bold text-white font-display">
+              <h3 className="font-sans text-sm font-semibold text-white">
                 Consultar o gestionar una sala existente
               </h3>
             </div>
@@ -642,7 +642,7 @@ export const GoogleMeetPanel: React.FC<GoogleMeetPanelProps> = ({ onNotify }) =>
                         </span>
                       )}
                     </div>
-                    <h3 className="text-lg font-bold text-white font-display mt-0.5">
+                    <h3 className="font-editorial text-xl text-white mt-0.5">
                       Código: {activeSpace.meetingCode || activeSpace.name}
                     </h3>
                     <p className="text-xs text-slate-400">{activeSpace.name}</p>
@@ -773,7 +773,7 @@ export const GoogleMeetPanel: React.FC<GoogleMeetPanelProps> = ({ onNotify }) =>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-[#F6C62B]" />
-                <h3 className="text-sm font-bold text-white font-display">
+                <h3 className="font-sans text-sm font-semibold text-white">
                   Historial reciente de reuniones ({records.length})
                 </h3>
               </div>

@@ -286,7 +286,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
                   {/* Name and University */}
                   <div className="overflow-hidden flex-1 sm:pt-1 space-y-0.5">
-                    <h2 className="profile-banner-name text-lg font-bold text-white truncate">{profileName || 'Student'}</h2>
+                    <h2 className="profile-banner-name font-editorial text-2xl sm:text-[1.75rem] text-white truncate">{profileName || 'Student'}</h2>
                     <p className="text-xs text-slate-400 truncate sm:mt-3.5">{user.email}</p>
                     <p className="text-xs text-[#F6C62B] font-medium flex items-center justify-center sm:justify-start gap-1 truncate pt-0.5">
                       <School className="w-3.5 h-3.5 shrink-0" />
@@ -477,7 +477,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 <div className="bg-[#0c162e] border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-xl space-y-5">
                   <div className="border-b border-slate-800/80 pb-3 flex items-center justify-between">
                     <div>
-                      <h3 className="text-base font-bold text-white">Identity & Contact</h3>
+                      <h3 className="font-editorial text-xl text-white">Identity &amp; Contact</h3>
                       <p className="text-xs text-slate-400 mt-0.5">Primary information visible to your assigned tutors.</p>
                     </div>
                     <span className="text-[11px] text-slate-400 flex items-center gap-1">
@@ -514,7 +514,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 {/* Block 2: Academic Program */}
                 <div className="bg-[#0c162e] border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-xl space-y-5">
                   <div className="border-b border-slate-800/80 pb-3">
-                    <h3 className="text-base font-bold text-white">Academic Enrollment</h3>
+                    <h3 className="font-editorial text-xl text-white">Academic Enrollment</h3>
                     <p className="text-xs text-slate-400 mt-0.5">Helps tutors prepare problems tailored to your institution curriculum.</p>
                   </div>
 
@@ -557,7 +557,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 {/* Block 3: Goals and Bio */}
                 <div className="bg-[#0c162e] border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-xl space-y-5">
                   <div className="border-b border-slate-800/80 pb-3">
-                    <h3 className="text-base font-bold text-white">Study Goals & Bio</h3>
+                    <h3 className="font-editorial text-xl text-white">Study Goals &amp; Bio</h3>
                     <p className="text-xs text-slate-400 mt-0.5">Share what concepts you want to conquer this term.</p>
                   </div>
 
@@ -605,7 +605,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               <div className="bg-[#0c162e] border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-xl space-y-6">
                 <div className="border-b border-slate-800/80 pb-3 flex items-center justify-between">
                   <div>
-                    <h3 className="text-base font-bold text-white">Focus Coursework</h3>
+                    <h3 className="font-editorial text-xl text-white">Focus Coursework</h3>
                     <p className="text-xs text-slate-400 mt-0.5">Classes where you seek regular tutoring or AI problem walkthroughs.</p>
                   </div>
                   <span className="text-xs font-semibold text-[#F6C62B]">{profileSubjects.length} selected</span>
@@ -723,7 +723,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 },
                 {
                   title: 'AI Problem Solver',
-                  desc: 'Solve 10 STEM problems step-by-step with the 24/7 AI Tutor.',
+                  desc: 'Solve 10 STEM problems step-by-step with the AI Tutor.',
                   icon: Bot,
                   unlocked: user.questionsResolved >= 10,
                   color: user.questionsResolved >= 10 ? 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30' : 'text-slate-400 bg-slate-800/50 border-slate-800',
@@ -752,7 +752,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 <div className="bg-[#0c162e] border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-xl space-y-6">
                   <div className="border-b border-slate-800/80 pb-3 flex items-center justify-between">
                     <div>
-                      <h3 className="text-base font-bold text-white">Academic Badges & Milestones</h3>
+                      <h3 className="font-editorial text-xl text-white">Academic Badges &amp; Milestones</h3>
                       <p className="text-xs text-slate-400 mt-0.5">Earned from your own sessions, AI problem-solving, and consistency on ProLnk.</p>
                     </div>
                     <span className="text-xs font-semibold text-emerald-400">
@@ -793,15 +793,15 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
             {activeTab === 'preferences' && (
               <div className="bg-[#0c162e] border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-xl space-y-6">
                 <div className="border-b border-slate-800/80 pb-3">
-                  <h3 className="text-base font-bold text-white">Study Preferences & AI Assistant</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Customize how you interact with tutors and your 24/7 AI tutor.</p>
+                  <h3 className="font-editorial text-xl text-white">Study Preferences &amp; AI Assistant</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Customize how you interact with tutors and your AI tutor.</p>
                 </div>
 
                 <div className="space-y-5 text-xs">
                   
                   {/* AI Response Style */}
                   <div className="space-y-2.5">
-                    <label className="block text-slate-200 font-semibold text-sm">24/7 AI Tutor Explanation Style:</label>
+                    <label className="block text-slate-200 font-semibold text-sm">AI Tutor Explanation Style:</label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <button
                         type="button"

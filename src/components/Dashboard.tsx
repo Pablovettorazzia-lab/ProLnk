@@ -1,6 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ProLnkLogo } from './Logo';
-import { AuthUser, Expert, ForumPost, ForumComment, DashboardSession, StudyDocumentPayload, VerifiedSource, UserTask, SavedSketch } from '../types';
+import {
+  AuthUser,
+  Expert,
+  ForumPost,
+  ForumComment,
+  DashboardSession,
+  StudyDocumentPayload,
+  VerifiedSource,
+  UserTask,
+  SavedSketch,
+  AiChatThread,
+  AiChatMessage
+} from '../types';
 import { EXPERTS_DATA, FORUM_POSTS, AI_PRESET_QUESTIONS } from '../data/mockData';
 import { WhiteboardCanvas } from './WhiteboardCanvas';
 import { VerifiedSourcesBar } from './VerifiedSourcesBar';
@@ -10,6 +22,13 @@ import { GoogleMeetPanel } from './GoogleMeetPanel';
 import { GoogleMeetModal } from './GoogleMeetModal';
 import { UserAvatar } from './UserAvatar';
 import { pickNextVariantIndex } from './Modals';
+import {
+  SessionSchedulePicker,
+  getDefaultFutureSchedule,
+  isScheduleInPast,
+  formatScheduleSummary,
+  getSessionSquareMeta
+} from './SessionSchedulePicker';
 import { readStudyFile, formatFileSize, MAX_STUDY_FILES } from '../utils/studyFiles';
 
 const DASHBOARD_PLANS_PHRASES = [
@@ -18,7 +37,7 @@ const DASHBOARD_PLANS_PHRASES = [
     line1: 'Un plan para',
     line2: 'cada ritmo.',
     accent: 'Sin ataduras.',
-    desc: 'Combina tutorías humanas 1-a-1, pizarra compartida e IA 24/7 según tus exámenes del mes.'
+    desc: 'Combina tutorías humanas 1-a-1, pizarra compartida e IA según tus exámenes del mes.'
   },
   {
     badge: 'Tu ritmo importa',
@@ -57,7 +76,7 @@ const DASHBOARD_HELP_PHRASES = [
     accent: 'Lo resolvemos juntos.'
   },
   {
-    badge: 'Soporte 24/7',
+    badge: 'Soporte ProLnk',
     line1: 'De la duda',
     line2: 'a la solución.',
     accent: 'En un par de clics.'
@@ -67,6 +86,129 @@ const DASHBOARD_HELP_PHRASES = [
     line1: 'IA o tutoría,',
     line2: 'tú decides.',
     accent: 'Estamos disponibles.'
+  }
+];
+
+const DASHBOARD_GREETING_PHRASES = [
+  {
+    kicker: 'Tu próxima gran idea empieza aquí',
+    headline: 'Un buen día para entender.',
+    subnote: 'Un paso a la vez. A tu ritmo.'
+  },
+  {
+    kicker: 'Menos bloqueos, más claridad',
+    headline: 'Hoy todo empieza a hacer clic.',
+    subnote: 'Pregunta sin miedo. Aquí se construye.'
+  },
+  {
+    kicker: 'Tu espacio de estudio',
+    headline: 'De «no me sale» a «ya lo dominé».',
+    subnote: 'Cada duda resuelta cuenta.'
+  },
+  {
+    kicker: 'Enfoque y constancia',
+    headline: 'Una buena pregunta lo cambia todo.',
+    subnote: 'Empieza por lo que hoy más te pesa.'
+  },
+  {
+    kicker: 'Paso a paso contigo',
+    headline: 'Entender de verdad toma menos de lo que crees.',
+    subnote: 'Tienes herramientas y tutores listos.'
+  },
+  {
+    kicker: 'Modo concentración',
+    headline: 'Hagamos fácil lo que parecía imposible.',
+    subnote: 'Paso a paso, fórmula a fórmula.'
+  },
+  {
+    kicker: 'Tu semestre, tu ritmo',
+    headline: 'Cada sesión te acerca a tu meta.',
+    subnote: 'La práctica guiada siempre gana.'
+  },
+  {
+    kicker: 'Curiosidad en marcha',
+    headline: 'Aprender no es memorizar, es conectar.',
+    subnote: 'Explora el porqué detrás de cada respuesta.'
+  },
+  {
+    kicker: 'Sin atajos vacíos',
+    headline: 'Construye bases que duren todo el año.',
+    subnote: 'Comprende el método, no solo el resultado.'
+  },
+  {
+    kicker: 'Hoy avanzas',
+    headline: 'El mejor momento para resolver esa duda es ahora.',
+    subnote: 'Sube tus apuntes o agenda en segundos.'
+  },
+  {
+    kicker: 'Listo para el próximo reto',
+    headline: 'Convierte tus parciales en oportunidades.',
+    subnote: 'Un concepto claro vale por diez repasos.'
+  },
+  {
+    kicker: 'Impulso académico',
+    headline: 'Aprender acompañado se siente diferente.',
+    subnote: 'IA, pizarra y tutores en un mismo lugar.'
+  },
+  {
+    kicker: 'Mente despierta',
+    headline: 'Las ideas grandes nacen de dudas pequeñas.',
+    subnote: 'Ninguna pregunta es demasiado básica.'
+  },
+  {
+    kicker: 'Progreso real',
+    headline: 'Hoy suma otro ladrillo a tu carrera.',
+    subnote: 'Constancia pequeña, resultados enormes.'
+  },
+  {
+    kicker: 'Todo bajo control',
+    headline: 'Respira, ordena tus temas y empecemos.',
+    subnote: 'Un problema a la vez.'
+  },
+  {
+    kicker: 'Tu laboratorio personal',
+    headline: 'Prueba, equivócate y vuelve a intentar.',
+    subnote: 'Así es como se domina cualquier materia.'
+  },
+  {
+    kicker: 'Claridad antes que prisa',
+    headline: 'Cuando entiendes el porqué, el cómo fluye solo.',
+    subnote: 'Tómate el tiempo de verlo claro.'
+  },
+  {
+    kicker: 'Listo para empezar',
+    headline: 'Tu futuro yo te agradecerá esta hora de estudio.',
+    subnote: 'Haz que hoy cuente.'
+  },
+  {
+    kicker: 'Conexión y aprendizaje',
+    headline: 'Siempre hay otra forma de explicarlo.',
+    subnote: 'Busquemos la que mejor funciona para ti.'
+  },
+  {
+    kicker: 'Energía enfocada',
+    headline: 'Menos estrés antes del examen, más seguridad.',
+    subnote: 'Prepara hoy lo que antes dejabas para el final.'
+  },
+  {
+    kicker: 'Avance constante',
+    headline: 'Cada ejercicio resuelto entrena tu criterio.',
+    subnote: 'Paso firme hacia tus objetivos.'
+  },
+  {
+    kicker: 'Espacio sin juicios',
+    headline: 'Aquí puedes preguntar diez veces hasta entender.',
+    subnote: 'A tu ritmo, sin presiones.'
+  },
+  {
+    kicker: 'Ideas en orden',
+    headline: 'Transforma apuntes sueltos en dominio total.',
+    subnote: 'Organiza, practica y confirma.'
+  },
+  {
+    kicker: 'Nuevo impulso',
+    headline: 'Hoy es un gran día para desbloquear esa materia.',
+    subnote: '¿Por cuál tema arrancamos?'
   }
 ];
 import {
@@ -124,7 +266,8 @@ import {
   Code2,
   ArrowRight,
   Link2,
-  Copy
+  Copy,
+  AlertCircle
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -132,15 +275,36 @@ interface DashboardProps {
   sessions?: DashboardSession[];
   tasks?: UserTask[];
   sketches?: SavedSketch[];
+  aiThreads?: AiChatThread[];
+  activeAiChatId?: string | null;
+  aiSavedMessages?: AiChatMessage[];
+  onSelectAiThread?: (chatId: string) => Promise<void> | void;
+  onNewAiChat?: () => void;
+  onSaveAiMessage?: (
+    chatId: string,
+    threadTitle: string,
+    message: AiChatMessage,
+    nextCount: number,
+    isNewThread: boolean
+  ) => Promise<void> | void;
+  onDeleteAiThread?: (chatId: string) => Promise<void> | void;
   posts?: ForumPost[];
   onVotePost?: (postId: string) => void;
   onPostQuestion?: (title: string, category: string, previewText?: string) => Promise<void> | void;
+  onLoadPostComments?: (postId: string) => Promise<void> | void;
+  onAddPostComment?: (post: ForumPost, comment: ForumComment) => Promise<void> | void;
+  onVotePostComment?: (postId: string, commentId: string, delta: 1 | -1) => Promise<void> | void;
   onAddTask?: (task: UserTask) => Promise<void> | void;
   onToggleTask?: (taskId: string, completed: boolean) => Promise<void> | void;
   onDeleteTask?: (taskId: string) => Promise<void> | void;
   onSaveSketch?: (sketch: SavedSketch) => Promise<void> | void;
   onDeleteSketch?: (sketchId: string) => Promise<void> | void;
-  onCompleteSession?: (sessionId: string) => Promise<void> | void;
+  onCompleteSession?: (sessionId: string, notes?: string) => Promise<void> | void;
+  onRescheduleSession?: (
+    sessionId: string,
+    schedule: { date: string; day: string; month: string; time: string }
+  ) => Promise<void> | void;
+  onCancelSession?: (sessionId: string) => Promise<void> | void;
   onAwardActivity?: (deltas: { xpDelta?: number; questionsDelta?: number; tutoringMinutesDelta?: number }) => Promise<void> | void;
   onLogOut: () => void;
   onViewLandingPage: () => void;
@@ -157,15 +321,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
   sessions: propSessions,
   tasks: propTasks,
   sketches: propSketches,
+  aiThreads = [],
+  activeAiChatId = null,
+  aiSavedMessages,
+  onSelectAiThread,
+  onNewAiChat,
+  onSaveAiMessage,
+  onDeleteAiThread,
   posts: propPosts,
   onVotePost,
   onPostQuestion,
+  onLoadPostComments,
+  onAddPostComment,
+  onVotePostComment,
   onAddTask,
   onToggleTask,
   onDeleteTask,
   onSaveSketch,
   onDeleteSketch,
   onCompleteSession,
+  onRescheduleSession,
+  onCancelSession,
   onAwardActivity,
   onLogOut,
   onBookExpert,
@@ -187,6 +363,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [helpModalOpen, setHelpModalOpen] = useState(false);
   const [plansPhraseIdx, setPlansPhraseIdx] = useState(0);
   const [helpPhraseIdx, setHelpPhraseIdx] = useState(0);
+  const [greetingPhraseIdx] = useState(() =>
+    pickNextVariantIndex('dash_greeting', DASHBOARD_GREETING_PHRASES.length)
+  );
   const [meetModalOpen, setMeetModalOpen] = useState(false);
   const [meetModalSession, setMeetModalSession] = useState<DashboardSession | null>(null);
   const [meetModalMode, setMeetModalMode] = useState<'launch' | 'join'>('launch');
@@ -194,6 +373,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
     Record<string, { meetingUri: string; meetingCode?: string }>
   >({});
   const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
+  const [rescheduleSessionId, setRescheduleSessionId] = useState<string | null>(null);
+  const [rescheduleDateKey, setRescheduleDateKey] = useState(() => getDefaultFutureSchedule().dateKey);
+  const [rescheduleTime24, setRescheduleTime24] = useState(() => getDefaultFutureSchedule().time24);
+  const [completingSessionId, setCompletingSessionId] = useState<string | null>(null);
+  const [completeNoteInput, setCompleteNoteInput] = useState('');
   const searchBoxRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
   const accountMenuRef = useRef<HTMLDivElement>(null);
@@ -455,7 +639,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const handleSolveTaskWithAI = (taskTitle: string, subject: string) => {
     setActiveTab('ai-chat');
     setAiInput(`Please help me solve this ${subject} assignment step-by-step: "${taskTitle}". Explain the foundational theorems, formulas, and show every calculation.`);
-    showDashboardToast(`Loaded "${taskTitle.substring(0, 25)}..." into 24/7 AI Solver.`);
+    showDashboardToast(`Loaded "${taskTitle.substring(0, 25)}..." into AI Solver.`);
   };
 
   const handleBookTutorForSubject = (subject: string) => {
@@ -478,11 +662,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
-  // Dashboard AI Solver state (with persistent session study library & live grounding)
+  // Dashboard AI Solver state (with persistent per-user chat history & live grounding)
+  const buildWelcomeAiMessage = (studentName: string) => ({
+    id: 'd-welcome',
+    sender: 'ai' as const,
+    text: `Hello ${studentName}! I am your ProLnk AI tutor. Every answer can verify facts via live Google Search links or directly read PDFs, notes, and homework photos you upload to your Study Library below.`
+  });
   const [aiInput, setAiInput] = useState('');
   const [aiStudyDocs, setAiStudyDocs] = useState<StudyDocumentPayload[]>([]);
   const [aiGroundingMode, setAiGroundingMode] = useState<'hybrid' | 'document' | 'web'>('hybrid');
   const aiFileInputRef = useRef<HTMLInputElement>(null);
+  const [localActiveChatId, setLocalActiveChatId] = useState<string | null>(activeAiChatId);
   const [aiChatMessages, setAiChatMessages] = useState<{
     id: string;
     sender: 'user' | 'ai';
@@ -493,14 +683,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
     webGroundingSkipped?: boolean;
     attachedFileNames?: string[];
     isError?: boolean;
-  }[]>([
-    {
-      id: 'd-1',
-      sender: 'ai',
-      text: `Hello ${user.name}! I am your ProLnk 24/7 AI tutor. Every answer can verify facts via live Google Search links or directly read PDFs, notes, and homework photos you upload to your Study Library below.`,
-    }
-  ]);
+  }[]>([buildWelcomeAiMessage(user.name)]);
   const [isAiThinking, setIsAiThinking] = useState(false);
+
+  useEffect(() => {
+    setLocalActiveChatId(activeAiChatId);
+    if (aiSavedMessages && aiSavedMessages.length > 0) {
+      setAiChatMessages(
+        aiSavedMessages.map(m => ({
+          id: m.id,
+          sender: m.sender,
+          text: m.text,
+          sources: m.sources,
+          searchQueries: m.searchQueries,
+          webGroundingSkipped: m.webGroundingSkipped,
+          attachedFileNames: m.attachedFileNames,
+          isError: m.isError
+        }))
+      );
+    } else if (!activeAiChatId) {
+      setAiChatMessages([buildWelcomeAiMessage(user.name)]);
+    }
+  }, [activeAiChatId, aiSavedMessages, user.name]);
 
   const handleUploadStudyFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -525,6 +729,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [communityPosts, setCommunityPosts] = useState<ForumPost[]>(() =>
     propPosts && propPosts.length > 0 ? propPosts : FORUM_POSTS
   );
+  const loadedCommentPostsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!propPosts || propPosts.length === 0) return;
     setCommunityPosts(prev => {
@@ -535,7 +740,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
         if (!existing) return pp;
         return {
           ...pp,
-          comments: existing.comments ?? pp.comments,
+          comments:
+            pp.comments && pp.comments.length >= (existing.comments?.length || 0)
+              ? pp.comments
+              : existing.comments ?? pp.comments,
           repliesCount: Math.max(pp.repliesCount, existing.repliesCount)
         };
       });
@@ -552,12 +760,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [newQuestionCategory, setNewQuestionCategory] = useState('Mathematics');
   const [newQuestionDetails, setNewQuestionDetails] = useState('');
 
-  const handleAddDashboardComment = (postId: string, e: React.FormEvent) => {
+  useEffect(() => {
+    if (
+      activeTab === 'community' &&
+      expandedDashboardPostId &&
+      onLoadPostComments &&
+      !loadedCommentPostsRef.current.has(expandedDashboardPostId)
+    ) {
+      loadedCommentPostsRef.current.add(expandedDashboardPostId);
+      onLoadPostComments(expandedDashboardPostId);
+    }
+  }, [activeTab, expandedDashboardPostId, onLoadPostComments]);
+
+  const handleAddDashboardComment = async (postId: string, e: React.FormEvent) => {
     e.preventDefault();
     const text = dashboardCommentInputs[postId]?.trim();
     if (!text) return;
+    const targetPost = communityPosts.find(p => p.id === postId);
     const newComment: ForumComment = {
       id: `c-dash-${Date.now()}`,
+      postId,
+      authorId: user.uid,
       author: `${user.name} (Student)`,
       authorRole: 'student',
       avatarInitials: user.name.split(' ').map(n => n[0]).join('').substring(0, 2) || 'ST',
@@ -566,24 +789,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
       upvotes: 1,
       userVoted: true
     };
-    setCommunityPosts(prev =>
-      prev.map(p => {
-        if (p.id === postId) {
-          const currentComments = p.comments || [];
-          return {
-            ...p,
-            repliesCount: p.repliesCount + 1,
-            comments: [...currentComments, newComment]
-          };
-        }
-        return p;
-      })
-    );
     setDashboardCommentInputs(prev => ({ ...prev, [postId]: '' }));
-    showDashboardToast('Comment added to discussion thread! 💬');
+    if (onAddPostComment && targetPost) {
+      await onAddPostComment(targetPost, newComment);
+    } else {
+      setCommunityPosts(prev =>
+        prev.map(p => {
+          if (p.id === postId) {
+            const currentComments = p.comments || [];
+            return {
+              ...p,
+              repliesCount: p.repliesCount + 1,
+              comments: [...currentComments, newComment]
+            };
+          }
+          return p;
+        })
+      );
+    }
+    showDashboardToast('Comment saved to discussion thread! +10 XP');
   };
 
-  const handleVoteDashboardComment = (postId: string, commentId: string) => {
+  const handleVoteDashboardComment = async (postId: string, commentId: string) => {
+    let delta: 1 | -1 = 1;
     setCommunityPosts(prev =>
       prev.map(p => {
         if (p.id === postId && p.comments) {
@@ -592,9 +820,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
             comments: p.comments.map(c => {
               if (c.id === commentId) {
                 const voted = c.userVoted;
+                delta = voted ? -1 : 1;
                 return {
                   ...c,
-                  upvotes: (c.upvotes || 0) + (voted ? -1 : 1),
+                  upvotes: Math.max(0, (c.upvotes || 0) + delta),
                   userVoted: !voted
                 };
               }
@@ -605,6 +834,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
         return p;
       })
     );
+    if (onVotePostComment) {
+      await onVotePostComment(postId, commentId, delta);
+    }
   };
 
   const handleCreateNewQuestion = async (e: React.FormEvent) => {
@@ -644,17 +876,41 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const activeDocs = aiGroundingMode === 'web' ? [] : aiStudyDocs;
     const effectiveMode = activeDocs.length > 0 ? aiGroundingMode : 'web';
 
-    setAiChatMessages(prev => [
-      ...prev,
+    const existingRealMessages = aiChatMessages.filter(m => m.id !== 'd-welcome');
+    const isNewThread = !localActiveChatId;
+    const chatId = localActiveChatId || `chat-${Date.now()}`;
+    const existingThreadTitle =
+      aiThreads.find(t => t.id === chatId)?.title || userText.slice(0, 80) || 'AI Study Session';
+
+    const userMsgId = `msg-${Date.now()}-u`;
+    const userMessageObj = {
+      id: userMsgId,
+      sender: 'user' as const,
+      text: userText,
+      attachedFileNames: activeDocs.map(d => d.name)
+    };
+
+    if (isNewThread) {
+      setLocalActiveChatId(chatId);
+    }
+
+    setAiChatMessages(prev => [...prev, userMessageObj]);
+    setIsAiThinking(true);
+
+    const countAfterUser = existingRealMessages.length + 1;
+    onSaveAiMessage?.(
+      chatId,
+      existingThreadTitle,
       {
-        id: Date.now() + '-u',
+        id: userMsgId,
+        chatId,
         sender: 'user',
         text: userText,
         attachedFileNames: activeDocs.map(d => d.name)
-      }
-    ]);
-
-    setIsAiThinking(true);
+      },
+      countAfterUser,
+      isNewThread
+    );
 
     try {
       const historyPayload = aiChatMessages
@@ -695,23 +951,45 @@ export const Dashboard: React.FC<DashboardProps> = ({
         .join('\n')
         .trim();
 
+      const aiText = cleanReply || data.reply;
+      const aiMsgId = `msg-${Date.now()}-a`;
+      const sourcesList = Array.isArray(data.sources) ? data.sources : [];
+      const queriesList = Array.isArray(data.searchQueries) ? data.searchQueries : [];
+
       setAiChatMessages(prev => [
         ...prev,
         {
-          id: Date.now() + '-a',
+          id: aiMsgId,
           sender: 'ai',
-          text: cleanReply || data.reply,
-          sources: Array.isArray(data.sources) ? data.sources : [],
-          searchQueries: Array.isArray(data.searchQueries) ? data.searchQueries : [],
+          text: aiText,
+          sources: sourcesList,
+          searchQueries: queriesList,
           webGroundingSkipped: Boolean(data.webGroundingSkipped)
         }
       ]);
+
+      onSaveAiMessage?.(
+        chatId,
+        existingThreadTitle,
+        {
+          id: aiMsgId,
+          chatId,
+          sender: 'ai',
+          text: aiText,
+          sources: sourcesList,
+          searchQueries: queriesList,
+          webGroundingSkipped: Boolean(data.webGroundingSkipped)
+        },
+        countAfterUser + 1,
+        false
+      );
+
       onAwardActivity?.({ xpDelta: 15, questionsDelta: 1 });
     } catch (err: any) {
       setAiChatMessages(prev => [
         ...prev,
         {
-          id: Date.now() + '-err',
+          id: `msg-${Date.now()}-err`,
           sender: 'ai',
           text:
             err?.message ||
@@ -762,7 +1040,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     badgeTone?: 'live' | 'workspace' | 'neutral';
   }[] = [
     { id: 'home', label: 'Overview', icon: Home },
-    { id: 'ai-chat', label: 'AI Tutor 24/7', icon: Bot, badge: 'Live', badgeTone: 'live' },
+    { id: 'ai-chat', label: 'AI Tutor', icon: Bot, badge: 'Live', badgeTone: 'live' },
     { id: 'tutors', label: 'Verified Tutors', icon: Users },
     { id: 'sessions', label: 'My Sessions', icon: Calendar },
     { id: 'community', label: 'Community Q&A', icon: MessageSquare },
@@ -780,8 +1058,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return override ? { ...s, meetUri: override.meetingUri, meetCode: override.meetingCode } : s;
   });
   const upcomingSessions = activeSessionsList.filter(s => s.status === 'upcoming');
-  const pastSessions = activeSessionsList.filter(s => s.status !== 'upcoming');
+  const pastSessions = activeSessionsList.filter(s => s.status === 'completed');
   const activePostsList = communityPosts;
+  const myPostsWithReplies = activePostsList.filter(
+    p => p.authorId && p.authorId === user.uid && p.repliesCount > 0
+  );
   const nextSession = upcomingSessions[0] || null;
   const userSketches = propSketches ?? [];
   const totalTutoringMinutes = Math.max(user.tutoringMinutes || 0, pastSessions.length * 60);
@@ -1334,7 +1615,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               {notificationsOpen && (
                 <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white border border-slate-200 rounded-2xl shadow-xl p-4 space-y-3 z-50 text-xs">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                    <span className="font-bold text-[#0F2249]">Notificaciones</span>
+                    <span className="font-bold text-[#0F2249]">Notificaciones de tu cuenta</span>
                     <button
                       type="button"
                       onClick={() => setNotificationsOpen(false)}
@@ -1343,7 +1624,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-2 max-h-72 overflow-y-auto">
                     {nextSession ? (
                       <button
                         type="button"
@@ -1369,6 +1650,42 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         <div className="text-[11px] text-slate-500 mt-0.5">Explora tutores verificados para agendar tu primera sesión</div>
                       </button>
                     )}
+
+                    {myPostsWithReplies.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNotificationsOpen(false);
+                          setExpandedDashboardPostId(myPostsWithReplies[0].id);
+                          setActiveTab('community');
+                        }}
+                        className="w-full text-left p-2.5 rounded-xl bg-emerald-50 border border-emerald-200/70 hover:bg-emerald-100/60 transition-colors cursor-pointer"
+                      >
+                        <div className="font-semibold text-emerald-900">
+                          {myPostsWithReplies.length} pregunta(s) tuya(s) con respuestas
+                        </div>
+                        <div className="text-[11px] text-emerald-700 mt-0.5 truncate">
+                          {myPostsWithReplies[0].title}
+                        </div>
+                      </button>
+                    )}
+
+                    {user.plan.toLowerCase().includes('trial') && user.daysLeft <= 1 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNotificationsOpen(false);
+                          setPlansModalOpen(true);
+                        }}
+                        className="w-full text-left p-2.5 rounded-xl bg-amber-50 border border-amber-200 hover:bg-amber-100/70 transition-colors cursor-pointer"
+                      >
+                        <div className="font-semibold text-amber-900">
+                          Tu prueba gratuita {user.daysLeft === 0 ? 'finalizó hoy' : 'termina en 1 día'}
+                        </div>
+                        <div className="text-[11px] text-amber-700 mt-0.5">Elige un plan para conservar sesiones e IA ilimitada</div>
+                      </button>
+                    )}
+
                     <div className="p-2.5 rounded-xl bg-[#FAFAF5] border border-slate-200/70">
                       <div className="font-semibold text-[#0F2249]">{tasks.filter(t => !t.completed).length} tareas pendientes</div>
                       <div className="text-[11px] text-slate-500 mt-0.5">Plan actual: {user.plan} ({user.xpPoints} XP)</div>
@@ -1451,21 +1768,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="p-5 sm:p-8 space-y-7 max-w-[1280px] mx-auto w-full">
             
             {/* Greeting Row */}
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-              <div>
-                <div className="text-[10px] tracking-[0.14em] uppercase font-semibold text-slate-500">
-                  Tu próxima gran idea empieza aquí
-                </div>
-                <h1 className="font-editorial text-3xl sm:text-[2.25rem] text-[#0F2249] tracking-tight mt-1 leading-tight">
-                  Un buen día para entender.
-                </h1>
-              </div>
+            {(() => {
+              const greeting = DASHBOARD_GREETING_PHRASES[greetingPhraseIdx] || DASHBOARD_GREETING_PHRASES[0];
+              return (
+                <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+                  <div>
+                    <div className="text-[10px] tracking-[0.14em] uppercase font-semibold text-slate-500">
+                      {greeting.kicker}
+                    </div>
+                    <h1 className="font-editorial text-3xl sm:text-[2.25rem] text-[#0F2249] tracking-tight mt-1 leading-tight">
+                      {greeting.headline}
+                    </h1>
+                  </div>
 
-              <div className="text-left sm:text-right">
-                <div className="text-xs font-medium text-slate-500">{todayFormatted}</div>
-                <div className="text-[11px] text-slate-400 mt-0.5">Un paso a la vez. A tu ritmo.</div>
-              </div>
-            </div>
+                  <div className="text-left sm:text-right">
+                    <div className="text-xs font-medium text-slate-500">{todayFormatted}</div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">{greeting.subnote}</div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Top Split Grid: PROLNK AI (8 cols) + TU PRÓXIMA SESIÓN (4 cols) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
@@ -1488,10 +1810,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-[10px] tracking-[0.14em] uppercase font-semibold text-slate-500">
                       ProLnk AI
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white border border-slate-200/90 text-[11px] font-medium text-emerald-700 shadow-2xs">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                      <span>Disponible 24/7</span>
                     </span>
                   </div>
 
@@ -1561,25 +1879,42 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         </button>
                       </div>
 
-                      <div className="flex items-start gap-3.5 mt-5">
-                        <div className="w-14 h-14 rounded-xl bg-[#F3F5F8] border border-slate-200/70 flex flex-col items-center justify-center shrink-0">
-                          <span className="text-[9px] uppercase tracking-wider font-semibold text-slate-500">
-                            {nextSession.month?.toUpperCase() || 'SES'}
-                          </span>
-                          <span className="font-editorial text-xl text-[#0F2249] leading-none mt-0.5">
-                            {nextSession.day || '01'}
-                          </span>
-                        </div>
+                      {(() => {
+                        const nextMeta = getSessionSquareMeta(nextSession);
+                        return (
+                          <div className="flex items-start gap-3.5 mt-5">
+                            <div className="flex flex-col items-center shrink-0">
+                              <div className="w-14 h-14 rounded-xl bg-[#F3F5F8] border border-slate-200/70 flex flex-col items-center justify-center">
+                                <span className="text-[9px] uppercase tracking-wider font-semibold text-slate-500">
+                                  {nextMeta.monthLabel}
+                                </span>
+                                <span className="font-editorial text-xl text-[#0F2249] leading-none mt-0.5 tabular-nums">
+                                  {nextMeta.dayNumber}
+                                </span>
+                              </div>
+                              {nextMeta.isTomorrow && (
+                                <span
+                                  className={`mt-1.5 inline-flex items-center gap-0.5 text-[11px] font-extrabold leading-none ${
+                                    isLightTheme ? 'text-red-600' : 'text-red-400'
+                                  }`}
+                                >
+                                  <AlertCircle className="w-3 h-3 shrink-0" />
+                                  <span>¡Mañana!</span>
+                                </span>
+                              )}
+                            </div>
 
-                        <div className="min-w-0">
-                          <h3 className="font-editorial text-lg text-[#0F2249] leading-snug truncate">
-                            {nextSession.topic}
-                          </h3>
-                          <p className="text-xs text-slate-500 mt-0.5 truncate">
-                            Con {nextSession.expertName} · Tutor verificado
-                          </p>
-                        </div>
-                      </div>
+                            <div className="min-w-0">
+                              <h3 className="font-editorial text-lg text-[#0F2249] leading-snug truncate">
+                                {nextSession.topic}
+                              </h3>
+                              <p className="text-xs text-slate-500 mt-0.5 truncate">
+                                Con {nextSession.expertName} · Tutor verificado
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })()}
 
                       <div className="flex items-center gap-2 text-xs text-slate-600 mt-5 pt-3 border-t border-slate-100">
                         <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -2189,7 +2524,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                 type="button"
                                 onClick={() => handleSolveTaskWithAI(task.title, task.subject)}
                                 className="px-2.5 py-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 text-[11px] font-bold transition-colors flex items-center gap-1 cursor-pointer"
-                                title="Solve problem step-by-step with 24/7 AI"
+                                title="Solve problem step-by-step with AI"
                               >
                                 <Bot className="w-3 h-3" />
                                 <span>Solve with AI</span>
@@ -2395,6 +2730,61 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <span className="hidden sm:inline">Grounded</span>
                   </span>
                 </div>
+              </div>
+
+              {/* Saved AI Conversation Threads Bar */}
+              <div className="px-5 py-2.5 bg-[#0a1329] border-b border-slate-800 flex items-center gap-2 overflow-x-auto text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLocalActiveChatId(null);
+                    setAiChatMessages([buildWelcomeAiMessage(user.name)]);
+                    onNewAiChat?.();
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-[#F6C62B] hover:bg-[#ffd744] text-slate-950 font-bold text-[11px] flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Nuevo chat</span>
+                </button>
+
+                {aiThreads.length === 0 ? (
+                  <span className="text-[11px] text-slate-400 truncate">
+                    Tus conversaciones con la IA se guardarán automáticamente en tu cuenta.
+                  </span>
+                ) : (
+                  aiThreads.map(thread => {
+                    const isCurrent = localActiveChatId === thread.id;
+                    return (
+                      <div
+                        key={thread.id}
+                        className={`inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-lg border text-[11px] shrink-0 transition-colors ${
+                          isCurrent
+                            ? 'bg-[#1b2f60] border-[#F6C62B]/60 text-white font-semibold'
+                            : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white'
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => onSelectAiThread?.(thread.id)}
+                          className="truncate max-w-[160px] text-left cursor-pointer"
+                          title={thread.title}
+                        >
+                          {thread.title}
+                        </button>
+                        {onDeleteAiThread && (
+                          <button
+                            type="button"
+                            onClick={() => onDeleteAiThread(thread.id)}
+                            className="p-0.5 rounded hover:bg-white/10 text-slate-400 hover:text-rose-300 cursor-pointer"
+                            title="Eliminar chat"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
               </div>
 
               {/* Study Library Drawer (Uploaded PDFs / Notes / Homework Photos) */}
@@ -2706,10 +3096,31 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex items-start gap-3.5 min-w-0">
-                          <div className="w-12 h-12 rounded-xl bg-[#0F2249] text-white flex flex-col items-center justify-center font-mono-nums shrink-0">
-                            <span className="text-sm font-bold leading-none">{s.day}</span>
-                            <span className="text-[9px] uppercase text-[#F5C52C] mt-0.5">{s.month}</span>
-                          </div>
+                          {(() => {
+                            const sessionMeta = getSessionSquareMeta(s);
+                            return (
+                              <div className="flex flex-col items-center shrink-0">
+                                <div className="w-12 h-12 rounded-xl bg-[#0F2249] text-white flex flex-col items-center justify-center font-mono-nums">
+                                  <span className="text-[9px] uppercase text-[#F5C52C] leading-none">
+                                    {sessionMeta.monthLabel}
+                                  </span>
+                                  <span className="text-sm font-bold leading-none mt-1 tabular-nums">
+                                    {sessionMeta.dayNumber}
+                                  </span>
+                                </div>
+                                {sessionMeta.isTomorrow && (
+                                  <span
+                                    className={`mt-1.5 inline-flex items-center gap-0.5 text-[10px] font-extrabold leading-none ${
+                                      isLightTheme ? 'text-red-600' : 'text-red-400'
+                                    }`}
+                                  >
+                                    <AlertCircle className="w-2.5 h-2.5 shrink-0" />
+                                    <span>¡Mañana!</span>
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/70 text-[10px] font-bold uppercase tracking-wider">
@@ -2763,12 +3174,37 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             Pizarra
                           </button>
 
+                          {onRescheduleSession && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCompletingSessionId(null);
+                                if (rescheduleSessionId === s.id) {
+                                  setRescheduleSessionId(null);
+                                } else {
+                                  const nextDefault = getDefaultFutureSchedule();
+                                  setRescheduleSessionId(s.id);
+                                  setRescheduleDateKey(nextDefault.dateKey);
+                                  setRescheduleTime24(nextDefault.time24);
+                                }
+                              }}
+                              className="px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 hover:border-[#0F2249]/40 text-[#0F2249] text-xs font-semibold cursor-pointer transition-colors"
+                            >
+                              Reprogramar
+                            </button>
+                          )}
+
                           {onCompleteSession && (
                             <button
                               type="button"
-                              onClick={async () => {
-                                await onCompleteSession(s.id);
-                                showDashboardToast('Sesión marcada como completada (+60 min, +80 XP).');
+                              onClick={() => {
+                                setRescheduleSessionId(null);
+                                if (completingSessionId === s.id) {
+                                  setCompletingSessionId(null);
+                                } else {
+                                  setCompletingSessionId(s.id);
+                                  setCompleteNoteInput('');
+                                }
                               }}
                               className="px-3.5 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-xs font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors"
                             >
@@ -2776,8 +3212,109 @@ export const Dashboard: React.FC<DashboardProps> = ({
                               <span>Completada</span>
                             </button>
                           )}
+
+                          {onCancelSession && (
+                            <button
+                              type="button"
+                              onClick={() => onCancelSession(s.id)}
+                              className="px-3 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-semibold cursor-pointer transition-colors"
+                            >
+                              Cancelar
+                            </button>
+                          )}
                         </div>
                       </div>
+
+                      {rescheduleSessionId === s.id && onRescheduleSession && (
+                        <form
+                          onSubmit={async e => {
+                            e.preventDefault();
+                            if (isScheduleInPast(rescheduleDateKey, rescheduleTime24)) return;
+                            const summary = formatScheduleSummary(rescheduleDateKey, rescheduleTime24);
+                            await onRescheduleSession(s.id, {
+                              date: summary.fullDate,
+                              day: summary.day.slice(0, 20),
+                              month: summary.month.slice(0, 20),
+                              time: summary.timeLabel.slice(0, 40)
+                            });
+                            setRescheduleSessionId(null);
+                          }}
+                          className="p-4 rounded-xl bg-white border border-slate-200 space-y-3 text-xs"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-bold text-[#0F2249]">Elige nueva fecha y hora:</span>
+                            <button
+                              type="button"
+                              onClick={() => setRescheduleSessionId(null)}
+                              className="text-slate-500 hover:text-slate-800 cursor-pointer"
+                            >
+                              Cerrar
+                            </button>
+                          </div>
+
+                          <SessionSchedulePicker
+                            compact
+                            dateKey={rescheduleDateKey}
+                            time24={rescheduleTime24}
+                            onChange={next => {
+                              setRescheduleDateKey(next.dateKey);
+                              setRescheduleTime24(next.time24);
+                            }}
+                          />
+
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setRescheduleSessionId(null)}
+                              className="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="submit"
+                              disabled={isScheduleInPast(rescheduleDateKey, rescheduleTime24)}
+                              className="px-4 py-2 rounded-lg bg-[#0F2249] hover:bg-[#19346b] disabled:opacity-45 disabled:cursor-not-allowed text-white font-bold cursor-pointer transition-colors"
+                            >
+                              Guardar cambio
+                            </button>
+                          </div>
+                        </form>
+                      )}
+
+                      {completingSessionId === s.id && onCompleteSession && (
+                        <form
+                          onSubmit={async e => {
+                            e.preventDefault();
+                            await onCompleteSession(s.id, completeNoteInput);
+                            setCompletingSessionId(null);
+                            setCompleteNoteInput('');
+                          }}
+                          className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 flex flex-col sm:flex-row sm:items-center gap-2.5 text-xs"
+                        >
+                          <input
+                            type="text"
+                            value={completeNoteInput}
+                            onChange={e => setCompleteNoteInput(e.target.value)}
+                            placeholder="Opcional: agrega tus apuntes clave o resumen de esta sesión..."
+                            className="flex-1 bg-white border border-emerald-300 rounded-lg px-3 py-1.5 text-xs text-[#0F2249]"
+                          />
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="submit"
+                              className="px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold cursor-pointer"
+                            >
+                              Confirmar (+80 XP)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setCompletingSessionId(null)}
+                              className="px-2.5 py-1.5 text-slate-600 hover:text-slate-900 cursor-pointer"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </form>
+                      )}
 
                       {/* Embedded Google Meet Link Strip (when linked to this booked session) */}
                       {s.meetUri && (
@@ -2901,7 +3438,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <span className="px-2.5 py-0.5 rounded-full bg-[#F6C62B]/20 text-[#F6C62B] text-[10px] font-extrabold uppercase tracking-wide">
                     Live Peer & Tutor Community
                   </span>
-                  <span className="text-xs text-slate-400">· 24/7 Verified Academic Answers</span>
+                  <span className="text-xs text-slate-400">· Verified Academic Answers</span>
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-bold text-white font-display">Student Homework Forum</h2>
                 <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-2xl">
@@ -3667,7 +4204,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <p className="text-xs leading-relaxed text-slate-600">{planCopy.desc}</p>
                 </div>
                 <div className="text-[10px] tracking-[0.16em] uppercase font-medium text-slate-500">
-                  IA 24/7  /  TUTORÍAS  /  CAMBIA CUANDO QUIERAS
+                  TUTOR IA  /  TUTORÍAS  /  CAMBIA CUANDO QUIERAS
                 </div>
               </div>
 
@@ -3766,7 +4303,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </div>
                 </div>
                 <div className="text-[10px] tracking-[0.16em] uppercase font-medium text-slate-500">
-                  IA 24/7  /  CLASSROOM  /  TUTORÍAS
+                  TUTOR IA  /  CLASSROOM  /  TUTORÍAS
                 </div>
               </div>
 
@@ -3791,7 +4328,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </div>
 
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  ¿Necesitas ayuda con tus sesiones, Google Classroom o apuntes? Puedes consultar a ProLnk AI las 24 horas o apartar una tutoría con un especialista verificado.
+                  ¿Necesitas ayuda con tus sesiones, Google Classroom o apuntes? Puedes consultar a ProLnk AI o apartar una tutoría con un especialista verificado.
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-1">
@@ -3803,7 +4340,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     }}
                     className="w-full sm:w-1/2 py-3 rounded-xl bg-[#F5C52C] hover:bg-[#eab921] text-[#0F2249] font-bold text-xs cursor-pointer transition-colors"
                   >
-                    Ir a AI Tutor 24/7
+                    Ir a AI Tutor
                   </button>
                   <button
                     type="button"

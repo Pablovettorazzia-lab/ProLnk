@@ -20,7 +20,18 @@ import { Footer } from './components/Footer';
 import { Dashboard } from './components/Dashboard';
 import { ProfilePage } from './components/ProfilePage';
 import { BookingModal, TrialModal, LoginModal, QuestionModal, ContactModal } from './components/Modals';
-import { AuthUser, Expert, ForumPost, DashboardSession, PublicPage, UserTask, SavedSketch } from './types';
+import {
+  AuthUser,
+  Expert,
+  ForumPost,
+  ForumComment,
+  DashboardSession,
+  PublicPage,
+  UserTask,
+  SavedSketch,
+  AiChatThread,
+  AiChatMessage
+} from './types';
 import { EXPERTS_DATA, FORUM_POSTS } from './data/mockData';
 import { CheckCircle2, X } from 'lucide-react';
 import { onAuthStatusChange, logoutUser } from './firebase/authService';
@@ -36,6 +47,7 @@ import {
   saveUserSession,
   updateUserSessionMeet,
   updateUserSessionStatus,
+  updateUserSessionSchedule,
   getUserTasks,
   saveUserTask,
   toggleUserTask,
@@ -43,12 +55,30 @@ import {
   getUserSketches,
   saveUserSketch,
   deleteUserSketch,
+  getUserAiChatThreads,
+  getAiChatMessages,
+  saveAiChatMessage,
+  deleteUserAiChatThread,
   getForumPosts,
   createForumPost,
-  updatePostVotes
+  updatePostVotes,
+  getForumPostComments,
+  addForumPostComment,
+  toggleForumCommentVote
 } from './firebase/firestoreService';
 
 export type { AuthUser } from './types';
+
+function computeDaysLeft(plan: string, createdAt?: string): number {
+  const lower = (plan || '').toLowerCase();
+  const isTrial = !lower || lower.includes('trial') || lower.includes('prueba');
+  if (!isTrial) return 30;
+  if (!createdAt) return 3;
+  const parsed = new Date(createdAt).getTime();
+  if (Number.isNaN(parsed)) return 3;
+  const daysElapsed = Math.max(0, Math.floor((Date.now() - parsed) / 86400000));
+  return Math.max(0, 3 - daysElapsed);
+}
 
 function toAuthUser(
   uid: string,
@@ -58,13 +88,14 @@ function toAuthUser(
   profile: UserProfileData | null,
   extra?: { semester?: string }
 ): AuthUser {
+  const resolvedPlan = profile?.plan || '3-Day Free Trial';
   return {
     uid,
     name: profile?.name || fallbackName || 'Student',
     email: profile?.email || fallbackEmail || '',
     photoURL: profile?.photoURL?.trim() || fallbackPhoto?.trim() || undefined,
-    plan: profile?.plan || '3-Day Free Trial',
-    daysLeft: 3,
+    plan: resolvedPlan,
+    daysLeft: computeDaysLeft(resolvedPlan, profile?.createdAt),
     bio: profile?.bio || '',
     university: profile?.university || '',
     major: profile?.major || '',
@@ -164,6 +195,9 @@ export default function App() {
   const [userSessions, setUserSessions] = useState<DashboardSession[]>([]);
   const [userTasks, setUserTasks] = useState<UserTask[]>([]);
   const [userSketches, setUserSketches] = useState<SavedSketch[]>([]);
+  const [userAiThreads, setUserAiThreads] = useState<AiChatThread[]>([]);
+  const [activeAiChatId, setActiveAiChatId] = useState<string | null>(null);
+  const [activeAiMessages, setActiveAiMessages] = useState<AiChatMessage[]>([]);
   const [communityPosts, setCommunityPosts] = useState<ForumPost[]>(FORUM_POSTS);
   const currentUserRef = React.useRef<AuthUser | null>(null);
   currentUserRef.current = currentUser;
@@ -211,14 +245,25 @@ export default function App() {
   };
 
   const loadUserPortalData = async (uid: string) => {
-    const [sessions, tasks, sketches] = await Promise.all([
+    const [sessions, tasks, sketches, threads] = await Promise.all([
       getUserSessions(uid),
       getUserTasks(uid),
-      getUserSketches(uid)
+      getUserSketches(uid),
+      getUserAiChatThreads(uid)
     ]);
     setUserSessions(sessions);
     setUserTasks(tasks);
     setUserSketches(sketches);
+    setUserAiThreads(threads);
+    if (threads.length > 0) {
+      const latestId = threads[0].id;
+      setActiveAiChatId(latestId);
+      const msgs = await getAiChatMessages(uid, latestId);
+      setActiveAiMessages(msgs);
+    } else {
+      setActiveAiChatId(null);
+      setActiveAiMessages([]);
+    }
   };
 
   // Sync with Firebase Auth and Firestore on mount
@@ -285,6 +330,9 @@ export default function App() {
         setUserSessions([]);
         setUserTasks([]);
         setUserSketches([]);
+        setUserAiThreads([]);
+        setActiveAiChatId(null);
+        setActiveAiMessages([]);
         try {
           localStorage.removeItem('prolnk_user');
         } catch {}
@@ -424,6 +472,9 @@ export default function App() {
     setUserSessions([]);
     setUserTasks([]);
     setUserSketches([]);
+    setUserAiThreads([]);
+    setActiveAiChatId(null);
+    setActiveAiMessages([]);
     setCurrentView('landing');
     try {
       localStorage.removeItem('prolnk_user');
@@ -436,19 +487,27 @@ export default function App() {
     setBookingModalOpen(true);
   };
 
-  const handleBookingConfirmed = async (details: { expertName: string; topic: string; total: number; date: string }) => {
+  const handleBookingConfirmed = async (details: {
+    expertName: string;
+    topic: string;
+    total: number;
+    date: string;
+    day?: string;
+    month?: string;
+    time?: string;
+  }) => {
     const now = new Date();
     const newSession: DashboardSession = {
       id: `session-${Date.now()}`,
       date: details.date,
-      day: details.date.split(' ')[0] || `${now.getDate()}`,
-      month: now.toLocaleDateString('en-US', { month: 'short' }),
+      day: details.day || details.date.split(' ')[0] || `${now.getDate()}`,
+      month: details.month || now.toLocaleDateString('en-US', { month: 'short' }),
       topic: details.topic || 'Tutoring Session',
       expertName: details.expertName,
       subject: details.topic || 'General Tutoring',
       tutorNotes: `Confirmed 1-on-1 session with ${details.expertName}. Meet link sent to your email (${currentUser?.email || 'email'}).`,
       status: 'upcoming',
-      time: details.date.includes('·') ? details.date.split('·')[1].trim() : 'Scheduled'
+      time: details.time || (details.date.includes('·') ? details.date.split('·')[1].trim() : 'Scheduled')
     };
 
     setUserSessions(prev => [newSession, ...prev]);
@@ -527,18 +586,23 @@ export default function App() {
     }
   };
 
-  const handleCompleteSession = async (sessionId: string) => {
+  const handleCompleteSession = async (sessionId: string, notes?: string) => {
     const existing = userSessions.find(s => s.id === sessionId);
     if (!existing || existing.status === 'completed') return;
 
+    const trimmedNotes = notes?.trim();
+    const resolvedNotes = trimmedNotes ? trimmedNotes : existing.tutorNotes;
+
     setUserSessions(prev =>
-      prev.map(s => (s.id === sessionId ? { ...s, status: 'completed' } : s))
+      prev.map(s =>
+        s.id === sessionId ? { ...s, status: 'completed', tutorNotes: resolvedNotes } : s
+      )
     );
 
     const activeUid = currentUserRef.current?.uid;
     if (activeUid && auth.currentUser?.uid === activeUid) {
       try {
-        await updateUserSessionStatus(activeUid, sessionId, 'completed');
+        await updateUserSessionStatus(activeUid, sessionId, 'completed', resolvedNotes);
       } catch (err) {
         handleServiceError(err);
       }
@@ -546,6 +610,121 @@ export default function App() {
 
     await handleAwardActivity({ xpDelta: 80, tutoringMinutesDelta: 60 });
     showToast('Session marked as completed! +60 min & +80 XP added to your account.');
+  };
+
+  const handleRescheduleSession = async (
+    sessionId: string,
+    schedule: { date: string; day: string; month: string; time: string }
+  ) => {
+    setUserSessions(prev =>
+      prev.map(s =>
+        s.id === sessionId
+          ? {
+              ...s,
+              date: schedule.date,
+              day: schedule.day,
+              month: schedule.month,
+              time: schedule.time
+            }
+          : s
+      )
+    );
+
+    const activeUid = currentUserRef.current?.uid;
+    if (activeUid && auth.currentUser?.uid === activeUid) {
+      try {
+        await updateUserSessionSchedule(activeUid, sessionId, schedule);
+      } catch (err) {
+        handleServiceError(err);
+      }
+    }
+    showToast(`Session rescheduled to ${schedule.date}.`);
+  };
+
+  const handleCancelSession = async (sessionId: string) => {
+    setUserSessions(prev =>
+      prev.map(s => (s.id === sessionId ? { ...s, status: 'cancelled' } : s))
+    );
+
+    const activeUid = currentUserRef.current?.uid;
+    if (activeUid && auth.currentUser?.uid === activeUid) {
+      try {
+        await updateUserSessionStatus(activeUid, sessionId, 'cancelled');
+      } catch (err) {
+        handleServiceError(err);
+      }
+    }
+    showToast('Session cancelled.');
+  };
+
+  const handleSelectAiThread = async (chatId: string) => {
+    const activeUid = currentUserRef.current?.uid;
+    setActiveAiChatId(chatId);
+    if (activeUid && auth.currentUser?.uid === activeUid) {
+      try {
+        const msgs = await getAiChatMessages(activeUid, chatId);
+        setActiveAiMessages(msgs);
+      } catch (err) {
+        handleServiceError(err);
+      }
+    }
+  };
+
+  const handleStartNewAiChat = () => {
+    setActiveAiChatId(null);
+    setActiveAiMessages([]);
+  };
+
+  const handleSaveAiMessage = async (
+    chatId: string,
+    threadTitle: string,
+    message: AiChatMessage,
+    nextCount: number,
+    isNewThread: boolean
+  ) => {
+    setActiveAiChatId(chatId);
+    setActiveAiMessages(prev => (prev.some(m => m.id === message.id) ? prev : [...prev, message]));
+    setUserAiThreads(prev => {
+      const exists = prev.some(t => t.id === chatId);
+      const updatedThread: AiChatThread = {
+        id: chatId,
+        userId: currentUserRef.current?.uid,
+        title: threadTitle,
+        previewText: message.text.slice(0, 140),
+        messageCount: nextCount,
+        updatedAt: new Date().toISOString()
+      };
+      if (exists) {
+        return [updatedThread, ...prev.filter(t => t.id !== chatId)];
+      }
+      return [updatedThread, ...prev];
+    });
+
+    const activeUid = currentUserRef.current?.uid;
+    if (activeUid && auth.currentUser?.uid === activeUid) {
+      try {
+        await saveAiChatMessage(activeUid, chatId, threadTitle, message, nextCount, isNewThread);
+      } catch (err) {
+        handleServiceError(err);
+      }
+    }
+  };
+
+  const handleDeleteAiThread = async (chatId: string) => {
+    setUserAiThreads(prev => prev.filter(t => t.id !== chatId));
+    if (activeAiChatId === chatId) {
+      setActiveAiChatId(null);
+      setActiveAiMessages([]);
+    }
+
+    const activeUid = currentUserRef.current?.uid;
+    if (activeUid && auth.currentUser?.uid === activeUid) {
+      try {
+        await deleteUserAiChatThread(activeUid, chatId);
+      } catch (err) {
+        handleServiceError(err);
+      }
+    }
   };
 
   const handleAddTask = async (task: UserTask) => {
@@ -659,6 +838,7 @@ export default function App() {
       id: `post-${Date.now()}`,
       title,
       author: active ? `${active.name} (Student)` : 'Guest Student',
+      authorId: active?.uid,
       category,
       repliesCount: 0,
       votes: 1,
@@ -697,6 +877,65 @@ export default function App() {
     }
   };
 
+  const handleLoadPostComments = async (postId: string) => {
+    try {
+      const loaded = await getForumPostComments(postId);
+      if (loaded.length === 0) return;
+      setCommunityPosts(prev =>
+        prev.map(p => {
+          if (p.id !== postId) return p;
+          const existing = p.comments || [];
+          const existingIds = new Set(loaded.map(c => c.id));
+          const merged = [
+            ...existing.filter(c => !existingIds.has(c.id)),
+            ...loaded
+          ];
+          return {
+            ...p,
+            comments: merged,
+            repliesCount: Math.max(p.repliesCount, merged.length)
+          };
+        })
+      );
+    } catch (err) {
+      handleServiceError(err);
+    }
+  };
+
+  const handleAddPostComment = async (post: ForumPost, comment: ForumComment) => {
+    const active = currentUserRef.current;
+    setCommunityPosts(prev =>
+      prev.map(p => {
+        if (p.id !== post.id) return p;
+        const currentComments = p.comments || [];
+        return {
+          ...p,
+          repliesCount: p.repliesCount + 1,
+          comments: [...currentComments, comment]
+        };
+      })
+    );
+
+    if (active?.uid && auth.currentUser?.uid === active.uid) {
+      try {
+        await addForumPostComment(post, comment, active.uid);
+        await handleAwardActivity({ xpDelta: 10 });
+      } catch (err) {
+        handleServiceError(err);
+      }
+    }
+  };
+
+  const handleVotePostComment = async (postId: string, commentId: string, delta: 1 | -1) => {
+    if (currentUserRef.current?.uid && auth.currentUser) {
+      try {
+        await toggleForumCommentVote(postId, commentId, delta);
+      } catch (err) {
+        handleServiceError(err);
+      }
+    }
+  };
+
   const handleVoteQuestion = async (postId: string) => {
     let voteDelta: 1 | -1 | null = null;
     setCommunityPosts(prev =>
@@ -731,7 +970,16 @@ export default function App() {
       'photoURL' in updatedData
         ? updatedData.photoURL?.trim() || undefined
         : active.photoURL;
-    const updated: AuthUser = { ...active, ...updatedData, photoURL: normalizedPhoto };
+    const nextPlan = updatedData.plan ?? active.plan;
+    const updated: AuthUser = {
+      ...active,
+      ...updatedData,
+      photoURL: normalizedPhoto,
+      daysLeft:
+        'plan' in updatedData
+          ? computeDaysLeft(nextPlan, undefined)
+          : active.daysLeft
+    };
     currentUserRef.current = updated;
     setCurrentUser(updated);
 
@@ -807,15 +1055,27 @@ export default function App() {
           sessions={userSessions}
           tasks={userTasks}
           sketches={userSketches}
+          aiThreads={userAiThreads}
+          activeAiChatId={activeAiChatId}
+          aiSavedMessages={activeAiMessages}
+          onSelectAiThread={handleSelectAiThread}
+          onNewAiChat={handleStartNewAiChat}
+          onSaveAiMessage={handleSaveAiMessage}
+          onDeleteAiThread={handleDeleteAiThread}
           posts={communityPosts}
           onVotePost={handleVoteQuestion}
           onPostQuestion={handlePostQuestion}
+          onLoadPostComments={handleLoadPostComments}
+          onAddPostComment={handleAddPostComment}
+          onVotePostComment={handleVotePostComment}
           onAddTask={handleAddTask}
           onToggleTask={handleToggleTask}
           onDeleteTask={handleDeleteTask}
           onSaveSketch={handleSaveSketch}
           onDeleteSketch={handleDeleteSketch}
           onCompleteSession={handleCompleteSession}
+          onRescheduleSession={handleRescheduleSession}
+          onCancelSession={handleCancelSession}
           onAwardActivity={handleAwardActivity}
           onLogOut={handleLogOut}
           onViewLandingPage={() => {}}

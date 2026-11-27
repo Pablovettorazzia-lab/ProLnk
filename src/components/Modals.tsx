@@ -10,6 +10,12 @@ import {
   Star,
   ShieldCheck
 } from 'lucide-react';
+import {
+  SessionSchedulePicker,
+  getDefaultFutureSchedule,
+  isScheduleInPast,
+  formatScheduleSummary
+} from './SessionSchedulePicker';
 
 type AuthMode = 'login' | 'signup';
 
@@ -32,7 +38,9 @@ export function pickNextVariantIndex(key: string, length: number): number {
   let prev = lastVariantByKey.get(key);
   if (prev === undefined) {
     try {
-      const stored = sessionStorage.getItem(`prolnk_phrase_${key}`);
+      const stored =
+        localStorage.getItem(`prolnk_phrase_${key}`) ??
+        sessionStorage.getItem(`prolnk_phrase_${key}`);
       if (stored !== null) {
         const parsed = Number(stored);
         if (!Number.isNaN(parsed)) prev = parsed;
@@ -45,6 +53,7 @@ export function pickNextVariantIndex(key: string, length: number): number {
   const next = prev === undefined ? Math.floor(Math.random() * length) : (prev + offset) % length;
   lastVariantByKey.set(key, next);
   try {
+    localStorage.setItem(`prolnk_phrase_${key}`, String(next));
     sessionStorage.setItem(`prolnk_phrase_${key}`, String(next));
   } catch {
     // ignore storage issues
@@ -531,27 +540,27 @@ const AuthSplitModal: React.FC<AuthModalProps> = ({
           <div className="editorial-grid-panel p-7 sm:p-9 md:p-10 flex flex-col justify-between gap-8 border-b md:border-b-0 md:border-r border-slate-200/80">
             <div className="space-y-6">
               {/* Top Gold Micro Pill */}
-              <div className="inline-block bg-[#F5C52C] text-[#0F2249] text-[10px] font-extrabold uppercase tracking-[0.12em] px-3 py-1.5 rounded-md shadow-2xs">
+              <div className="inline-block bg-[#F5C52C] text-[#0F2249] font-mono-nums text-[10px] font-bold uppercase tracking-[0.14em] px-3 py-1.5 rounded-md shadow-2xs">
                 {activeCopy.badge}
               </div>
 
               {/* Dynamic Editorial Headline: Returning vs First-Time (rotates every open) */}
               <div>
-                <h2 className="font-editorial text-[2rem] sm:text-[2.35rem] leading-[1.06] text-[#0F2249] tracking-tight">
+                <h2 className="font-editorial text-[2.25rem] sm:text-[2.6rem] leading-[1.04] text-[#0F2249] tracking-tight">
                   {activeCopy.line1}
                   <br />
                   {activeCopy.line2}
                 </h2>
 
                 <div className="mt-1.5 inline-block">
-                  <span className="font-serif-accent text-[1.95rem] sm:text-[2.25rem] leading-[1.08] text-[#0F2249] block">
+                  <span className="font-serif-accent text-[2.15rem] sm:text-[2.5rem] leading-[1.06] text-[#0F2249] block">
                     {activeCopy.accent}
                   </span>
                   <div className="h-[5px] w-full bg-[#F5C52C] rounded-full mt-1" />
                 </div>
               </div>
 
-              <p className="text-xs sm:text-[13.5px] leading-relaxed text-slate-600 max-w-xs">
+              <p className="font-subtitle text-xs sm:text-[13.5px] leading-relaxed text-slate-600 max-w-xs">
                 {activeCopy.description}
               </p>
             </div>
@@ -559,16 +568,16 @@ const AuthSplitModal: React.FC<AuthModalProps> = ({
             {/* Bottom Floating Card + Strip */}
             <div className="space-y-5">
               <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs space-y-2">
-                <div className="text-[10px] tracking-[0.14em] uppercase font-semibold text-slate-500">
+                <div className="font-mono-nums text-[10px] tracking-[0.14em] uppercase font-medium text-slate-500">
                   {activeCopy.cardKicker}
                 </div>
-                <div className="font-editorial text-[1.25rem] leading-snug text-[#0F2249]">
+                <div className="font-editorial text-[1.4rem] leading-snug text-[#0F2249]">
                   {activeCopy.cardTitle}
                 </div>
                 <p className="text-xs text-slate-600">{activeCopy.cardBody}</p>
               </div>
 
-              <div className="text-[10px] tracking-[0.18em] uppercase font-medium text-slate-500">
+              <div className="font-mono-nums text-[10px] tracking-[0.18em] uppercase font-medium text-slate-500">
                 {isLogin ? 'IA 24/7  /  TUTORÍAS  /  COMUNIDAD' : '3 DÍAS GRATIS  /  SIN TARJETA  /  ACCESO TOTAL'}
               </div>
             </div>
@@ -579,13 +588,13 @@ const AuthSplitModal: React.FC<AuthModalProps> = ({
             <div className="max-w-md w-full mx-auto space-y-5">
               {/* Heading */}
               <div>
-                <div className="text-[10px] tracking-[0.16em] uppercase font-semibold text-slate-500">
+                <div className="font-mono-nums text-[10px] tracking-[0.16em] uppercase font-medium text-slate-500">
                   {isLogin ? 'Tu espacio de aprendizaje' : 'Bienvenido a ProLnk'}
                 </div>
-                <h1 className="font-editorial text-3xl sm:text-[2.1rem] text-[#0F2249] mt-1 leading-tight">
+                <h1 className="font-editorial text-3xl sm:text-[2.35rem] text-[#0F2249] mt-1 leading-tight">
                   {isLogin ? 'Inicia sesión' : 'Crea tu cuenta'}
                 </h1>
-                <p className="text-xs sm:text-[13px] text-slate-600 mt-1">
+                <p className="font-subtitle text-xs sm:text-[13px] text-slate-600 mt-1">
                   {activeCopy.subtitle}
                 </p>
               </div>
@@ -905,7 +914,15 @@ interface BookingModalProps {
   expert: Expert | null;
   isOpen: boolean;
   onClose: () => void;
-  onBookingConfirmed: (details: { expertName: string; topic: string; total: number; date: string }) => void;
+  onBookingConfirmed: (details: {
+    expertName: string;
+    topic: string;
+    total: number;
+    date: string;
+    day?: string;
+    month?: string;
+    time?: string;
+  }) => void;
 }
 
 export const BookingModal: React.FC<BookingModalProps> = ({
@@ -914,8 +931,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   onClose,
   onBookingConfirmed
 }) => {
-  const [date, setDate] = useState('Hoy (primer horario disponible)');
-  const [time, setTime] = useState('6:00 PM');
+  const initialSchedule = getDefaultFutureSchedule();
+  const [dateKey, setDateKey] = useState(initialSchedule.dateKey);
+  const [time24, setTime24] = useState(initialSchedule.time24);
   const [topic, setTopic] = useState('');
   const [urgentUpgrade, setUrgentUpgrade] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -923,8 +941,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setDate('Hoy (primer horario disponible)');
-      setTime('6:00 PM');
+      const nextDefault = getDefaultFutureSchedule();
+      setDateKey(nextDefault.dateKey);
+      setTime24(nextDefault.time24);
       setTopic('');
       setUrgentUpgrade(false);
       setIsSuccess(false);
@@ -946,16 +965,22 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const basePrice = expert.hourlyRate;
   const totalPrice = basePrice + (urgentUpgrade ? 25 : 0);
   const copy = BOOKING_VARIANTS[phraseIdx];
+  const scheduleInvalid = isScheduleInPast(dateKey, time24);
+  const scheduleSummary = formatScheduleSummary(dateKey, time24);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isScheduleInPast(dateKey, time24)) return;
     setIsSuccess(true);
     setTimeout(() => {
       onBookingConfirmed({
         expertName: expert.name,
         topic: topic || `Sesión de ${expert.subjects[0]}`,
         total: totalPrice,
-        date: `${date} · ${time}`
+        date: scheduleSummary.fullDate,
+        day: scheduleSummary.day,
+        month: scheduleSummary.month,
+        time: scheduleSummary.timeLabel
       });
       setIsSuccess(false);
       onClose();
@@ -1075,39 +1100,16 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
               <div>
                 <label className="block text-[#0F2249] font-semibold mb-1.5 text-xs">
-                  Fecha preferida
+                  Fecha y horario personalizado
                 </label>
-                <select
-                  value={date}
-                  onChange={e => setDate(e.target.value)}
-                  className="w-full bg-[#F4F6FA] border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-[#0F2249]"
-                >
-                  <option value="Hoy (primer horario disponible)">Hoy (primer horario disponible)</option>
-                  <option value="Mañana">Mañana</option>
-                  <option value="Este fin de semana">Este fin de semana</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[#0F2249] font-semibold mb-1.5 text-xs">
-                  Horario preferido
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {['4:00 PM', '6:00 PM', '8:00 PM'].map(t => (
-                    <button
-                      type="button"
-                      key={t}
-                      onClick={() => setTime(t)}
-                      className={`py-2.5 px-3 rounded-xl border text-xs font-semibold transition-colors cursor-pointer ${
-                        time === t
-                          ? 'bg-[#0F2249] text-white border-[#0F2249]'
-                          : 'bg-[#F4F6FA] text-slate-700 border-slate-200 hover:border-[#0F2249]/40'
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
+                <SessionSchedulePicker
+                  dateKey={dateKey}
+                  time24={time24}
+                  onChange={next => {
+                    setDateKey(next.dateKey);
+                    setTime24(next.time24);
+                  }}
+                />
               </div>
 
               <div
@@ -1148,7 +1150,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="w-3/5 py-3 rounded-xl bg-[#0F2249] hover:bg-[#19346b] text-white text-xs font-bold cursor-pointer shadow-xs inline-flex items-center justify-center gap-2 transition-colors"
+                  disabled={scheduleInvalid}
+                  className="w-3/5 py-3 rounded-xl bg-[#0F2249] hover:bg-[#19346b] disabled:opacity-45 disabled:cursor-not-allowed text-white text-xs font-bold cursor-pointer shadow-xs inline-flex items-center justify-center gap-2 transition-colors"
                 >
                   <span>Confirmar cita (Q{totalPrice})</span>
                   <ArrowRight className="w-4 h-4" />
@@ -1162,7 +1165,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
               </div>
               <h4 className="font-editorial text-2xl text-[#0F2249]">¡Cita apartada!</h4>
               <p className="text-xs text-slate-600 max-w-xs mx-auto leading-relaxed">
-                Reservaste con <strong>{expert.name}</strong> ({date} · {time}). Revisa tu portal para entrar a la sala en vivo.
+                Reservaste con <strong>{expert.name}</strong> ({scheduleSummary.fullDate}). Revisa tu portal para entrar a la sala en vivo.
               </p>
             </div>
           )}

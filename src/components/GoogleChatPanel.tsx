@@ -281,7 +281,7 @@ export const GoogleChatPanel: React.FC<GoogleChatPanelProps> = ({ onNotify }) =>
               </span>
             )}
           </div>
-          <h2 className="text-2xl font-bold text-white font-display">
+          <h2 className="font-editorial text-2xl sm:text-3xl text-white">
             Google Chat · Espacios de Estudio
           </h2>
           <p className="text-xs text-slate-300 mt-1">
@@ -387,7 +387,7 @@ export const GoogleChatPanel: React.FC<GoogleChatPanelProps> = ({ onNotify }) =>
             <MessageSquare className="w-6 h-6" />
           </div>
           <div className="max-w-md mx-auto space-y-2">
-            <h3 className="text-lg font-bold text-white">Conecta tu cuenta de Google Workspace</h3>
+            <h3 className="font-editorial text-2xl text-white">Conecta tu cuenta de Google Workspace</h3>
             <p className="text-xs text-slate-300 leading-relaxed">
               Inicia sesión con tu cuenta de Google Workspace para ver tus espacios, miembros y mensajes de Google Chat directamente desde tu portal de ProLnk.
             </p>
@@ -534,7 +534,7 @@ export const GoogleChatPanel: React.FC<GoogleChatPanelProps> = ({ onNotify }) =>
                 {/* Space Header */}
                 <div className="px-5 py-3.5 bg-[#080f21] border-b border-slate-800 flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <h3 className="text-sm font-bold text-white truncate">
+                    <h3 className="font-sans text-sm font-semibold text-white truncate">
                       {getSpaceTitle(selectedSpace)}
                     </h3>
                     <div className="text-[11px] text-slate-400 truncate">

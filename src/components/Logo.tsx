@@ -34,7 +34,7 @@ export const ProLnkLogo: React.FC<LogoProps> = ({
       />
 
       {showWordmark && (
-        <span className={`font-bold tracking-tight ${text} font-display ${light ? 'text-white' : 'text-[#0F2249]'}`}>
+        <span className={`font-bold tracking-tight ${text} font-brand ${light ? 'text-white' : 'text-[#0F2249]'}`}>
           Pro<span className={light ? 'text-[#FAC71D]' : 'text-[#C88A00]'}>Lnk</span>
         </span>
       )}

@@ -14,40 +14,107 @@
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     background-color: #FAFAF5;
     color: #0F2249;
+    font-feature-settings: "kern" 1, "liga" 1;
     transition: background-color 0.2s ease, color 0.2s ease;
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  /* Size-tiered Editorial Typographic System */
+  h1 {
+    font-family: 'Instrument Serif', Georgia, serif;
+    font-weight: 400;
+    letter-spacing: -0.028em;
+    line-height: 1.05;
+    text-wrap: balance;
+  }
+
+  h2 {
+    font-family: 'Instrument Serif', Georgia, serif;
+    font-weight: 400;
     letter-spacing: -0.02em;
+    line-height: 1.1;
+    text-wrap: balance;
+  }
+
+  h3 {
+    font-family: 'Instrument Serif', Georgia, serif;
+    font-weight: 400;
+    letter-spacing: -0.015em;
+    line-height: 1.18;
+  }
+
+  h4, h5, h6 {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.012em;
+    line-height: 1.32;
   }
 }
 
-.font-display {
+/* Wordmark & UI Sans display */
+.font-brand {
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.025em;
 }
 
+/* Primary Editorial Serif Display (section & modal headings) */
+.font-display,
 .font-editorial {
-  font-family: 'Fraunces', Georgia, serif;
-  font-variation-settings: "opsz" 72;
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+  text-wrap: balance;
 }
 
+/* Italic Editorial Emphasis ("Sigamos aprendiendo.", "one question.") */
 .font-serif-accent {
-  font-family: 'Fraunces', Georgia, serif;
+  font-family: 'Instrument Serif', Georgia, serif;
   font-style: italic;
   font-weight: 400;
+  letter-spacing: -0.02em;
 }
 
+/* Extra-large Hero Display */
 .font-hero-headline {
-  font-family: 'Fraunces', Georgia, serif;
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  line-height: 1.04;
+  text-wrap: balance;
+}
+
+/* Editorial Subtitles & Lead Copy */
+.font-subtitle {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  font-weight: 400;
+  letter-spacing: -0.005em;
+  line-height: 1.58;
+}
+
+/* Monospace Eyebrow Kickers & Tabular Numerals */
+.font-kicker {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.6875rem;
   font-weight: 500;
-  letter-spacing: -0.025em;
-  line-height: 1.08;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-variant-numeric: tabular-nums;
 }
 
 .font-mono-nums {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
+}
+
+/* Dark mode optical tracking compensation for light serif strokes on dark surfaces */
+html.theme-dark h1,
+html.theme-dark h2,
+html.theme-dark h3,
+html.theme-dark .font-editorial,
+html.theme-dark .font-hero-headline,
+html.theme-dark .font-serif-accent,
+html.theme-dark .font-display {
+  letter-spacing: -0.012em;
 }
 
 /* Soft clean scrollbars */
@@ -90,7 +157,7 @@
    ======================================================== */
 html.theme-dark body {
   background-color: #070D1B;
-  color: #F1F5F9;
+  color: #FFFFFF;
 }
 
 html.theme-dark ::-webkit-scrollbar-track {
@@ -129,6 +196,8 @@ html.theme-dark .bg-\[\#EEF2F8\],
 html.theme-dark .bg-\[\#F2F6FB\],
 html.theme-dark .bg-\[\#F3F5F8\],
 html.theme-dark .bg-\[\#F4F6FA\],
+html.theme-dark .bg-\[\#F4F7FB\],
+html.theme-dark .bg-\[\#F7F8FA\],
 html.theme-dark .bg-\[\#E8EEF6\],
 html.theme-dark .bg-\[\#FAF9F2\] {
   background-color: #101C36 !important;
@@ -154,6 +223,7 @@ html.theme-dark .bg-slate-100 {
 html.theme-dark .hover\:bg-slate-50:hover,
 html.theme-dark .hover\:bg-slate-100:hover,
 html.theme-dark .hover\:bg-slate-200:hover,
+html.theme-dark .hover\:bg-slate-200\/80:hover,
 html.theme-dark .hover\:bg-amber-50:hover,
 html.theme-dark .hover\:bg-white:hover {
   background-color: #1A2B52 !important;
@@ -201,35 +271,34 @@ html.theme-dark .divide-slate-300\/70 > :not(:last-child) {
   border-color: rgba(148, 163, 184, 0.18) !important;
 }
 
-/* Text contrast on dark surfaces */
+/* Text contrast on dark surfaces — predominantly crisp white */
 html.theme-dark .text-slate-950,
 html.theme-dark .text-slate-900,
-html.theme-dark .text-slate-800 {
-  color: #F8FAFC !important;
+html.theme-dark .text-slate-800,
+html.theme-dark .text-slate-700,
+html.theme-dark .text-slate-600,
+html.theme-dark .text-slate-200,
+html.theme-dark .text-slate-100,
+html.theme-dark .text-\[\#0F2249\] {
+  color: #FFFFFF !important;
 }
 
-html.theme-dark .text-slate-700,
-html.theme-dark .text-slate-600 {
-  color: #CBD5E1 !important;
+html.theme-dark .text-slate-300,
+html.theme-dark .text-\[\#0F2249\]\/80,
+html.theme-dark .text-\[\#0F2249\]\/75,
+html.theme-dark .text-\[\#0F2249\]\/70 {
+  color: rgba(255, 255, 255, 0.90) !important;
 }
 
 html.theme-dark .text-slate-500,
 html.theme-dark .text-slate-400 {
-  color: #94A3B8 !important;
+  color: rgba(255, 255, 255, 0.80) !important;
 }
 
 html.theme-dark .hover\:text-slate-950:hover,
 html.theme-dark .hover\:text-slate-900:hover,
 html.theme-dark .hover\:text-\[\#0F2249\]:hover {
-  color: #F5C542 !important;
-}
-
-/* Navy text & accents on dark background become warm honey gold */
-html.theme-dark .text-\[\#0F2249\],
-html.theme-dark .text-\[\#0F2249\]\/80,
-html.theme-dark .text-\[\#0F2249\]\/75,
-html.theme-dark .text-\[\#0F2249\]\/70 {
-  color: #F5C542 !important;
+  color: #FFFFFF !important;
 }
 
 /* Tinted status pills on dark surfaces */
@@ -297,23 +366,33 @@ html.theme-dark .bg-\[\#0F2249\] .text-rose-300 {
   color: #FDA4AF !important;
 }
 html.theme-dark .bg-\[\#0F2249\] .text-slate-200 {
-  color: #E2E8F0 !important;
+  color: #FFFFFF !important;
 }
 html.theme-dark .bg-\[\#0F2249\] .text-slate-300 {
-  color: #CBD5E1 !important;
+  color: rgba(255, 255, 255, 0.88) !important;
 }
 
 html.theme-dark .bg-\[\#F5C542\],
-html.theme-dark .bg-\[\#F5C542\] *,
+html.theme-dark .bg-\[\#F5C542\].text-slate-950,
+html.theme-dark .bg-\[\#F5C542\].text-\[\#0F2249\],
+html.theme-dark .bg-\[\#F5C542\] *:not(.bg-\[\#0F2249\]):not(.bg-\[\#0F2249\] *),
 html.theme-dark .bg-\[\#F6C62B\],
-html.theme-dark .bg-\[\#F6C62B\] *,
+html.theme-dark .bg-\[\#F6C62B\].text-slate-950,
+html.theme-dark .bg-\[\#F6C62B\].text-\[\#0F2249\],
+html.theme-dark .bg-\[\#F6C62B\] *:not(.bg-\[\#0F2249\]):not(.bg-\[\#0F2249\] *),
 html.theme-dark .bg-\[\#F5C52C\],
+html.theme-dark .bg-\[\#F5C52C\].text-slate-950,
+html.theme-dark .bg-\[\#F5C52C\].text-\[\#0F2249\],
 html.theme-dark .bg-\[\#F5C52C\] *:not(.bg-\[\#0F2249\]):not(.bg-\[\#0F2249\] *) {
   color: #0F2249 !important;
 }
 
 html.theme-dark .bg-\[\#F5C52C\] .bg-\[\#0F2249\],
-html.theme-dark .bg-\[\#F5C52C\] .bg-\[\#0F2249\] * {
+html.theme-dark .bg-\[\#F5C52C\] .bg-\[\#0F2249\] *,
+html.theme-dark .bg-\[\#F5C542\] .bg-\[\#0F2249\],
+html.theme-dark .bg-\[\#F5C542\] .bg-\[\#0F2249\] *,
+html.theme-dark .bg-\[\#F6C62B\] .bg-\[\#0F2249\],
+html.theme-dark .bg-\[\#F6C62B\] .bg-\[\#0F2249\] * {
   background-color: #0F2249 !important;
   color: #FFFFFF !important;
 }
@@ -323,12 +402,20 @@ html.theme-dark input:not([type='range']):not(.bg-transparent),
 html.theme-dark select,
 html.theme-dark textarea {
   background-color: #091124 !important;
-  color: #F8FAFC !important;
+  color: #FFFFFF !important;
   border-color: rgba(148, 163, 184, 0.3) !important;
+}
+html.theme-dark input[type='time'],
+html.theme-dark input[type='date'] {
+  color-scheme: dark;
+}
+.portal-light input[type='time'],
+.portal-light input[type='date'] {
+  color-scheme: light;
 }
 html.theme-dark input::placeholder,
 html.theme-dark textarea::placeholder {
-  color: #64748B !important;
+  color: rgba(255, 255, 255, 0.58) !important;
 }
 
 /* ========================================================
@@ -696,8 +783,13 @@ html.theme-dark textarea::placeholder {
   }
 }
 
+html.theme-dark .gsi-material-button {
+  background-color: #FFFFFF !important;
+  color: #1F1F1F !important;
+}
+
 html.theme-dark input.bg-transparent {
-  color: #F8FAFC !important;
+  color: #FFFFFF !important;
 }
 
 /* Editorial split-modal graph-paper surface matching ProLnk studio aesthetic */

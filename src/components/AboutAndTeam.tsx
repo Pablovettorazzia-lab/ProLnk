@@ -51,7 +51,7 @@ export const AboutAndTeam: React.FC = () => {
                   {member.initials}
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-xs sm:text-sm font-bold text-[#0F2249] truncate">
+                  <h3 className="font-sans text-xs sm:text-sm font-semibold text-[#0F2249] truncate">
                     {member.name}
                   </h3>
                   <p className="text-[11px] text-slate-500 truncate mt-0.5">{member.role}</p>

@@ -429,7 +429,7 @@ export const GoogleClassroomPanel: React.FC<GoogleClassroomPanelProps> = ({ onNo
               </span>
             )}
           </div>
-          <h2 className="text-2xl font-bold text-white font-display">
+          <h2 className="font-editorial text-2xl sm:text-3xl text-white">
             Google Classroom · Cursos y Tareas
           </h2>
           <p className="text-xs text-slate-300 mt-1">
@@ -488,7 +488,7 @@ export const GoogleClassroomPanel: React.FC<GoogleClassroomPanelProps> = ({ onNo
             <GraduationCap className="w-6 h-6" />
           </div>
           <div className="max-w-md mx-auto space-y-2">
-            <h3 className="text-lg font-bold text-white">Conecta tu cuenta de Google Classroom</h3>
+            <h3 className="font-editorial text-2xl text-white">Conecta tu cuenta de Google Classroom</h3>
             <p className="text-xs text-slate-300 leading-relaxed">
               Inicia sesión con tu cuenta de Google para ver tus cursos, anuncios, tareas pendientes, materiales y entregas directamente en tu portal de ProLnk.
             </p>
@@ -657,7 +657,7 @@ export const GoogleClassroomPanel: React.FC<GoogleClassroomPanelProps> = ({ onNo
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-base font-bold text-white truncate">
+                        <h3 className="font-editorial text-xl text-white truncate">
                           {selectedCourse.name}
                         </h3>
                         {selectedCourse.courseState && (
