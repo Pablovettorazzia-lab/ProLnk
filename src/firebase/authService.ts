@@ -3,6 +3,10 @@ import {
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
   signOut,
   onAuthStateChanged,
   User as FirebaseUser,
@@ -68,9 +72,17 @@ export const GOOGLE_CLASSROOM_SCOPES = [
   'https://www.googleapis.com/auth/classroom.topics.readonly'
 ];
 
+// Google Meet OAuth scopes provisioned for this applet
+export const GOOGLE_MEET_SCOPES = [
+  'https://www.googleapis.com/auth/meetings.space.created',
+  'https://www.googleapis.com/auth/meetings.space.readonly',
+  'https://www.googleapis.com/auth/meetings.space.settings'
+];
+
 export const GOOGLE_WORKSPACE_SCOPES = [
   ...GOOGLE_CHAT_SCOPES,
-  ...GOOGLE_CLASSROOM_SCOPES
+  ...GOOGLE_CLASSROOM_SCOPES,
+  ...GOOGLE_MEET_SCOPES
 ];
 
 const googleProvider = new GoogleAuthProvider();
@@ -135,11 +147,16 @@ export const clearWorkspaceAccessToken = (): void => {
   cachedWorkspaceAccessToken = null;
 };
 
-// Aliases kept for existing GoogleChatPanel imports
+// Aliases kept for existing GoogleChatPanel and GoogleMeetPanel imports
 export const initGoogleChatAuth = initGoogleWorkspaceAuth;
 export const googleChatSignIn = googleWorkspaceSignIn;
 export const getChatAccessToken = getWorkspaceAccessToken;
 export const clearChatAccessToken = clearWorkspaceAccessToken;
+
+export const initGoogleMeetAuth = initGoogleWorkspaceAuth;
+export const googleMeetSignIn = googleWorkspaceSignIn;
+export const getMeetAccessToken = getWorkspaceAccessToken;
+export const clearMeetAccessToken = clearWorkspaceAccessToken;
 
 export const formatFirebaseAuthError = (error: unknown): string => {
   if (error instanceof FirebaseError) {
@@ -188,9 +205,18 @@ export const registerUserWithEmail = async (
   return cred.user;
 };
 
-export const loginUserWithEmail = async (email: string, pass: string): Promise<FirebaseUser> => {
+export const loginUserWithEmail = async (
+  email: string,
+  pass: string,
+  keepSignedIn = true
+): Promise<FirebaseUser> => {
+  await setPersistence(auth, keepSignedIn ? browserLocalPersistence : browserSessionPersistence);
   const cred = await signInWithEmailAndPassword(auth, email, pass);
   return cred.user;
+};
+
+export const resetUserPassword = async (email: string): Promise<void> => {
+  await sendPasswordResetEmail(auth, email);
 };
 
 export const logoutUser = async (): Promise<void> => {

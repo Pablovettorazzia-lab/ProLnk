@@ -2,7 +2,7 @@
   "entities": {
     "UserProfile": {
       "title": "UserProfile",
-      "description": "User account profile document storing identity, subscription plan, and academic preferences",
+      "description": "User account profile document storing identity, subscription plan, personal stats, and academic preferences",
       "type": "object",
       "properties": {
         "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$", "description": "User unique identifier matching auth UID" },
@@ -19,6 +19,14 @@
         "learningGoal": { "type": "string", "maxLength": 500, "description": "Student academic learning goal" },
         "streakDays": { "type": "number", "description": "Consecutive study streak in days" },
         "xpPoints": { "type": "number", "description": "Accumulated student experience points" },
+        "questionsResolved": { "type": "number", "description": "Total AI & challenge questions solved by this user" },
+        "tutoringMinutes": { "type": "number", "description": "Total minutes spent in tutoring sessions" },
+        "notesSavedCount": { "type": "number", "description": "Total notes and sketches saved by this user" },
+        "forumPostsCount": { "type": "number", "description": "Total community questions published by this user" },
+        "lastActiveDate": { "type": "string", "maxLength": 40, "description": "YYYY-MM-DD of user's last active study day" },
+        "aiExplanationStyle": { "type": "string", "enum": ["detailed", "quick"], "description": "Preferred AI tutor explanation format" },
+        "emailNotifications": { "type": "boolean", "description": "Whether community reply notifications are enabled" },
+        "sessionReminders": { "type": "boolean", "description": "Whether 1-on-1 session reminders are enabled" },
         "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp of account creation" },
         "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp of last profile update" }
       },
@@ -43,10 +51,29 @@
         "status": { "type": "string", "enum": ["upcoming", "confirmed", "completed", "cancelled"], "description": "Session status" },
         "tutorNotes": { "type": "string", "maxLength": 1000, "description": "Notes and feedback provided by tutor" },
         "urgentUsed": { "type": "boolean", "description": "Whether priority urgent tutoring was applied" },
+        "meetUri": { "type": "string", "maxLength": 300, "description": "Attached Google Meet room URL" },
+        "meetCode": { "type": "string", "maxLength": 60, "description": "Attached Google Meet meeting code" },
         "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp" },
         "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp" }
       },
       "required": ["id", "userId", "expertName", "subject", "topic", "date", "status", "createdAt", "updatedAt"]
+    },
+    "UserTask": {
+      "title": "UserTask",
+      "description": "Personal assignment or study task tracked by the user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$", "description": "Task ID" },
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$", "description": "Owner user UID" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 240, "description": "Assignment title or topic" },
+        "subject": { "type": "string", "minLength": 1, "maxLength": 80, "description": "Subject category" },
+        "dueDate": { "type": "string", "minLength": 1, "maxLength": 80, "description": "Due date label" },
+        "completed": { "type": "boolean", "description": "Completion state" },
+        "urgency": { "type": "string", "enum": ["high", "medium", "low"], "description": "Task urgency level" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp" }
+      },
+      "required": ["id", "userId", "title", "subject", "dueDate", "completed", "createdAt", "updatedAt"]
     },
     "ForumPost": {
       "title": "ForumPost",
@@ -89,11 +116,15 @@
   "firestore": {
     "/users/{userId}": {
       "schema": "UserProfile",
-      "description": "Private user profile and account details"
+      "description": "Private user profile, personal statistics, and study preferences"
     },
     "/users/{userId}/sessions/{sessionId}": {
       "schema": "UserSession",
       "description": "User private scheduled and completed tutoring sessions"
+    },
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": "UserTask",
+      "description": "User private assignments and exam planner tasks"
     },
     "/users/{userId}/sketches/{sketchId}": {
       "schema": "UserSketch",

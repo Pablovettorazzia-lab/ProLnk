@@ -297,7 +297,7 @@ CRITICAL VERIFICATION RULES:
 // Multi-turn grounded ProLnk AI tutor & study assistant
 app.post('/api/ai/chat', async (req, res) => {
   try {
-    const { message, history = [], documents, groundingMode = 'hybrid' } = req.body || {};
+    const { message, history = [], documents, groundingMode = 'hybrid', userContext } = req.body || {};
     if (!message || typeof message !== 'string' || !message.trim()) {
       return res.status(400).json({ error: 'Message is required' });
     }
@@ -310,9 +310,15 @@ app.post('/api/ai/chat', async (req, res) => {
 
     const attachedDocs = sanitizeDocuments(documents);
     const useWebSearch = groundingMode !== 'document';
+    const explanationStyle = userContext?.explanationStyle === 'quick' ? 'quick' : 'detailed';
+    const styleDirective =
+      explanationStyle === 'quick'
+        ? 'STUDENT PREFERENCE: Direct & Concise mode — prioritize the final answer and brief key reduction steps (under 110 words).'
+        : 'STUDENT PREFERENCE: Step-by-Step Detailed mode — explain underlying theorems, every algebraic step, and intuition clearly (under 180 words unless solving complex multi-step math).';
 
     const systemInstruction = `You are ProLnk AI, an elite 24/7 academic tutor and intelligent assistant for the ProLnk education platform.
 You assist university and high school students with homework, exam prep, uploaded study notes/PDFs, and navigating ProLnk.
+${styleDirective}
 
 KNOWLEDGE OF PROLNK PLATFORM FEATURES:
 1. 1-on-1 Human Tutoring: Verified tutors from top universities. Tutors include:
@@ -338,8 +344,7 @@ VERIFICATION & CITATION RULES (CRITICAL):
   - [ACTION:book_expert]
   - [ACTION:start_trial]
   - [ACTION:view_pricing]
-  - [ACTION:ask_community]
-- Keep responses clear, accurate, step-by-step, and concise (under 180 words unless solving complex multi-step math).`;
+  - [ACTION:ask_community]`;
 
     const contents: Array<{ role: 'user' | 'model'; parts: Part[] }> = [];
     if (Array.isArray(history)) {

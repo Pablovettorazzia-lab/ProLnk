@@ -699,3 +699,32 @@ html.theme-dark textarea::placeholder {
 html.theme-dark input.bg-transparent {
   color: #F8FAFC !important;
 }
+
+/* Editorial split-modal graph-paper surface matching ProLnk studio aesthetic */
+.editorial-grid-panel {
+  background-color: #EDF2F8;
+  background-image:
+    linear-gradient(to right, rgba(15, 34, 73, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(15, 34, 73, 0.045) 1px, transparent 1px);
+  background-size: 26px 26px;
+}
+
+html.theme-dark .editorial-grid-panel {
+  background-color: #101C36 !important;
+  background-image:
+    linear-gradient(to right, rgba(245, 197, 44, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(245, 197, 44, 0.06) 1px, transparent 1px);
+  background-size: 26px 26px;
+  border-color: rgba(148, 163, 184, 0.2) !important;
+}
+
+html.theme-dark .editorial-segmented-track {
+  background-color: #091124 !important;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+html.theme-dark .editorial-segmented-active {
+  background-color: #152D5E !important;
+  color: #F8FAFC !important;
+}
+

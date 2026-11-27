@@ -6,39 +6,37 @@ import {
   RotateCcw,
   Download,
   Save,
-  Grid,
   Trash2,
-  Sparkles,
   CheckCircle2
 } from 'lucide-react';
+import { SavedSketch } from '../types';
 
-interface SavedSketch {
-  id: string;
-  dataUrl: string;
-  title: string;
-  timestamp: string;
+interface WhiteboardCanvasProps {
+  sketches?: SavedSketch[];
+  onSaveSketch?: (sketch: SavedSketch) => Promise<void> | void;
+  onDeleteSketch?: (sketchId: string) => Promise<void> | void;
 }
 
-export const WhiteboardCanvas: React.FC = () => {
+export const WhiteboardCanvas: React.FC<WhiteboardCanvasProps> = ({
+  sketches,
+  onSaveSketch,
+  onDeleteSketch
+}) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentTool, setCurrentTool] = useState<'pen' | 'highlighter' | 'eraser'>('pen');
   const [strokeColor, setStrokeColor] = useState('#F6C62B');
   const [strokeWidth, setStrokeWidth] = useState(3);
   const [bgStyle, setBgStyle] = useState<'grid' | 'dots' | 'lines' | 'blank'>('grid');
-  
+  const [sketchTitleInput, setSketchTitleInput] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
   // History for undo
   const [history, setHistory] = useState<ImageData[]>([]);
-  
-  // Saved user sketches
-  const [savedSketches, setSavedSketches] = useState<SavedSketch[]>([
-    {
-      id: 'sketch-sample',
-      dataUrl: '',
-      title: 'Calculus derivatives scratch notes',
-      timestamp: 'Today, 4:15 PM'
-    }
-  ]);
+
+  // Local fallback if uncontrolled
+  const [localSketches, setLocalSketches] = useState<SavedSketch[]>([]);
+  const savedSketches = sketches ?? localSketches;
   const [toast, setToast] = useState<string | null>(null);
 
   // Initialize canvas
@@ -48,7 +46,6 @@ export const WhiteboardCanvas: React.FC = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set high-DPI scaling
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width * 2;
     canvas.height = rect.height * 2;
@@ -56,7 +53,6 @@ export const WhiteboardCanvas: React.FC = () => {
 
     drawBackground(ctx, rect.width, rect.height, bgStyle);
 
-    // Save initial state
     const initialData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     setHistory([initialData]);
   }, []);
@@ -191,7 +187,6 @@ export const WhiteboardCanvas: React.FC = () => {
     ctx.closePath();
     ctx.globalAlpha = 1.0;
 
-    // Push state to history
     const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
     setHistory(prev => [...prev.slice(-15), data]);
   };
@@ -204,7 +199,7 @@ export const WhiteboardCanvas: React.FC = () => {
     if (!ctx) return;
 
     const newHistory = [...history];
-    newHistory.pop(); // remove current state
+    newHistory.pop();
     const previous = newHistory[newHistory.length - 1];
     ctx.putImageData(previous, 0, 0);
     setHistory(newHistory);
@@ -220,21 +215,50 @@ export const WhiteboardCanvas: React.FC = () => {
     setHistory([data]);
   };
 
-  const handleSaveSketch = () => {
+  const handleSaveSketch = async () => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const dataUrl = canvas.toDataURL('image/png');
+    if (!canvas || isSaving) return;
+
+    let dataUrl = canvas.toDataURL('image/png');
+    if (dataUrl.length > 480000) {
+      dataUrl = canvas.toDataURL('image/webp', 0.85);
+    }
+    if (dataUrl.length > 480000) {
+      dataUrl = canvas.toDataURL('image/jpeg', 0.78);
+    }
 
     const newSketch: SavedSketch = {
       id: 'sketch-' + Date.now(),
       dataUrl,
-      title: `Personal Study Notes (${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`,
+      title:
+        sketchTitleInput.trim() ||
+        `Study Note (${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`,
       timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
     };
 
-    setSavedSketches(prev => [newSketch, ...prev]);
-    setToast('Drawing saved to your notebook notes!');
-    setTimeout(() => setToast(null), 3000);
+    setIsSaving(true);
+    try {
+      if (onSaveSketch) {
+        await onSaveSketch(newSketch);
+      } else {
+        setLocalSketches(prev => [newSketch, ...prev]);
+      }
+      setSketchTitleInput('');
+      setToast('Drawing saved to your personal account notes!');
+      setTimeout(() => setToast(null), 3000);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteSketch = async (sketchId: string) => {
+    if (onDeleteSketch) {
+      await onDeleteSketch(sketchId);
+    } else {
+      setLocalSketches(prev => prev.filter(s => s.id !== sketchId));
+    }
+    setToast('Note removed from your account.');
+    setTimeout(() => setToast(null), 2500);
   };
 
   const handleDownload = () => {
@@ -249,10 +273,10 @@ export const WhiteboardCanvas: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      
+
       {/* Canvas Tool Bar */}
       <div className="bg-[#0c162e] border border-slate-700/80 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
-        
+
         {/* Tool selectors */}
         <div className="flex items-center gap-1.5 p-1 bg-[#080f21] rounded-xl border border-slate-800">
           <button
@@ -361,7 +385,15 @@ export const WhiteboardCanvas: React.FC = () => {
         </div>
 
         {/* Canvas Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="text"
+            value={sketchTitleInput}
+            onChange={e => setSketchTitleInput(e.target.value)}
+            placeholder="Note title (optional)..."
+            className="bg-[#080f21] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#F6C62B] w-40"
+          />
+
           <button
             type="button"
             onClick={handleUndo}
@@ -384,10 +416,11 @@ export const WhiteboardCanvas: React.FC = () => {
           <button
             type="button"
             onClick={handleSaveSketch}
-            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow"
+            disabled={isSaving}
+            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow"
           >
             <Save className="w-3.5 h-3.5" />
-            <span>Save Note</span>
+            <span>{isSaving ? 'Saving...' : 'Save Note'}</span>
           </button>
 
           <button
@@ -433,61 +466,73 @@ export const WhiteboardCanvas: React.FC = () => {
       <div className="space-y-3 pt-2">
         <div className="flex items-center justify-between">
           <h3 className="font-bold text-white text-sm font-display">My Saved Sketches & Diagrams</h3>
-          <span className="text-xs text-slate-400">{savedSketches.length} notes</span>
+          <span className="text-xs text-slate-400">
+            {savedSketches.length} {savedSketches.length === 1 ? 'note' : 'notes'}
+          </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {savedSketches.map(sk => (
-            <div
-              key={sk.id}
-              className="bg-[#0c162e] border border-slate-700/80 rounded-xl p-4 flex flex-col justify-between hover:border-slate-600 transition-colors"
-            >
-              <div>
-                {sk.dataUrl ? (
-                  <div className="w-full h-32 rounded-lg bg-[#080f21] border border-slate-800 overflow-hidden mb-3 flex items-center justify-center">
-                    <img src={sk.dataUrl} alt={sk.title} className="max-h-full object-contain" />
-                  </div>
-                ) : (
-                  <div className="w-full h-32 rounded-lg bg-[#080f21] border border-dashed border-slate-800 mb-3 flex flex-col items-center justify-center text-slate-400 p-2 text-center text-xs">
-                    <Pen className="w-6 h-6 text-[#F6C62B] mb-1" />
-                    <span>Derivative & limit scratch notes</span>
-                  </div>
-                )}
-                <h4 className="font-bold text-white text-xs">{sk.title}</h4>
-                <p className="text-[11px] text-slate-400 mt-0.5">{sk.timestamp}</p>
-              </div>
+        {savedSketches.length === 0 ? (
+          <div className="bg-[#0c162e] border border-dashed border-slate-700 rounded-xl p-8 text-center space-y-2">
+            <Pen className="w-6 h-6 text-[#F6C62B] mx-auto" />
+            <p className="text-xs font-semibold text-white">No saved notes yet</p>
+            <p className="text-[11px] text-slate-400 max-w-md mx-auto">
+              Sketch a diagram or equation above and click "Save Note" to store it privately in your ProLnk account.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {savedSketches.map(sk => (
+              <div
+                key={sk.id}
+                className="bg-[#0c162e] border border-slate-700/80 rounded-xl p-4 flex flex-col justify-between hover:border-slate-600 transition-colors"
+              >
+                <div>
+                  {sk.dataUrl ? (
+                    <div className="w-full h-32 rounded-lg bg-[#080f21] border border-slate-800 overflow-hidden mb-3 flex items-center justify-center">
+                      <img src={sk.dataUrl} alt={sk.title} className="max-h-full object-contain" />
+                    </div>
+                  ) : (
+                    <div className="w-full h-32 rounded-lg bg-[#080f21] border border-dashed border-slate-800 mb-3 flex flex-col items-center justify-center text-slate-400 p-2 text-center text-xs">
+                      <Pen className="w-6 h-6 text-[#F6C62B] mb-1" />
+                      <span>Whiteboard note</span>
+                    </div>
+                  )}
+                  <h4 className="font-bold text-white text-xs truncate">{sk.title}</h4>
+                  <p className="text-[11px] text-slate-400 mt-0.5">{sk.timestamp}</p>
+                </div>
 
-              <div className="mt-3 pt-2 border-t border-slate-800 flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (sk.dataUrl) {
-                      const img = new Image();
-                      img.onload = () => {
-                        const canvas = canvasRef.current;
-                        if (!canvas) return;
-                        const ctx = canvas.getContext('2d');
-                        if (!ctx) return;
-                        ctx.drawImage(img, 0, 0, canvas.width / 2, canvas.height / 2);
-                      };
-                      img.src = sk.dataUrl;
-                    }
-                  }}
-                  className="text-xs font-semibold text-[#F6C62B] hover:underline cursor-pointer"
-                >
-                  Load to canvas
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSavedSketches(prev => prev.filter(s => s.id !== sk.id))}
-                  className="text-[11px] text-slate-400 hover:text-rose-400 cursor-pointer"
-                >
-                  Delete
-                </button>
+                <div className="mt-3 pt-2 border-t border-slate-800 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (sk.dataUrl) {
+                        const img = new Image();
+                        img.onload = () => {
+                          const canvas = canvasRef.current;
+                          if (!canvas) return;
+                          const ctx = canvas.getContext('2d');
+                          if (!ctx) return;
+                          ctx.drawImage(img, 0, 0, canvas.width / 2, canvas.height / 2);
+                        };
+                        img.src = sk.dataUrl;
+                      }
+                    }}
+                    className="text-xs font-semibold text-[#F6C62B] hover:underline cursor-pointer"
+                  >
+                    Load to canvas
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteSketch(sk.id)}
+                    className="text-[11px] text-slate-400 hover:text-rose-400 cursor-pointer"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
     </div>

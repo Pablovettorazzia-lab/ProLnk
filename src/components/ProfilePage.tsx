@@ -22,12 +22,11 @@ import {
   BookOpen,
   User,
   ShieldCheck,
-  Award,
   Plus,
   Sun,
   Moon
 } from 'lucide-react';
-import { AuthUser } from '../App';
+import { AuthUser } from '../types';
 import { StudyProgressChart } from './StudyProgressChart';
 import { UserAvatar } from './UserAvatar';
 
@@ -37,7 +36,7 @@ interface ProfilePageProps {
   onBackToDashboard: () => void;
   onViewLandingPage?: () => void;
   onLogOut: () => void;
-  onUpdateProfile?: (updated: Partial<AuthUser>) => void;
+  onUpdateProfile?: (updated: Partial<AuthUser>) => Promise<void> | void;
   isDarkMode?: boolean;
   onToggleDarkMode?: () => void;
 }
@@ -69,38 +68,48 @@ const SUGGESTED_SUBJECTS = [
 
 export const ProfilePage: React.FC<ProfilePageProps> = ({
   user,
-  sessionsCount = 3,
+  sessionsCount = 0,
   onBackToDashboard,
   onLogOut,
   onUpdateProfile,
   isDarkMode = false,
   onToggleDarkMode
 }) => {
-  // Form state
+  // Form state initialized from per-user profile (clean defaults for new users)
   const [profileName, setProfileName] = useState(user.name || '');
-  const [profileBio, setProfileBio] = useState(user.bio || 'University student focused on calculus, physics, and STEM coursework with ProLnk.');
-  const [profileUniversity, setProfileUniversity] = useState(user.university || 'Universidad del Valle de Guatemala');
-  const [profileMajor, setProfileMajor] = useState(user.major || 'Computer Science & Engineering');
-  const [profileSemester, setProfileSemester] = useState(user.semester || '4th Semester');
-  const [profileLearningGoal, setProfileLearningGoal] = useState(user.learningGoal || 'Master integration techniques and maintain a GPA above 90.');
+  const [profileBio, setProfileBio] = useState(user.bio || '');
+  const [profileUniversity, setProfileUniversity] = useState(user.university || '');
+  const [profileMajor, setProfileMajor] = useState(user.major || '');
+  const [profileSemester, setProfileSemester] = useState(user.semester || '');
+  const [profileLearningGoal, setProfileLearningGoal] = useState(user.learningGoal || '');
   const [profilePhotoURL, setProfilePhotoURL] = useState(user.photoURL || '');
-  const [profileSubjects, setProfileSubjects] = useState<string[]>(
-    user.targetSubjects && user.targetSubjects.length > 0
-      ? user.targetSubjects
-      : ['Multivariable Calculus', 'Physics II', 'Linear Algebra']
-  );
+  const [profileSubjects, setProfileSubjects] = useState<string[]>(user.targetSubjects || []);
   const [newSubjectInput, setNewSubjectInput] = useState('');
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [activeTab, setActiveTab] = useState<'info' | 'subjects' | 'achievements' | 'preferences'>('info');
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [sessionReminders, setSessionReminders] = useState(true);
-  const [aiExplanationStyle, setAiExplanationStyle] = useState<'detailed' | 'quick'>('detailed');
+  const [emailNotifications, setEmailNotifications] = useState(user.emailNotifications ?? true);
+  const [sessionReminders, setSessionReminders] = useState(user.sessionReminders ?? true);
+  const [aiExplanationStyle, setAiExplanationStyle] = useState<'detailed' | 'quick'>(user.aiExplanationStyle ?? 'detailed');
   const [isSaving, setIsSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
+
+  useEffect(() => {
+    setProfileName(user.name || '');
+    setProfileBio(user.bio || '');
+    setProfileUniversity(user.university || '');
+    setProfileMajor(user.major || '');
+    setProfileSemester(user.semester || '');
+    setProfileLearningGoal(user.learningGoal || '');
+    setProfilePhotoURL(user.photoURL || '');
+    setProfileSubjects(user.targetSubjects || []);
+    setEmailNotifications(user.emailNotifications ?? true);
+    setSessionReminders(user.sessionReminders ?? true);
+    setAiExplanationStyle(user.aiExplanationStyle ?? 'detailed');
+  }, [user]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -112,23 +121,42 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
     if (!profileName.trim()) return;
 
     setIsSaving(true);
-    if (onUpdateProfile) {
-      await onUpdateProfile({
-        name: profileName.trim(),
-        bio: profileBio.trim(),
-        university: profileUniversity.trim(),
-        major: profileMajor.trim(),
-        semester: profileSemester.trim(),
-        learningGoal: profileLearningGoal.trim(),
-        photoURL: profilePhotoURL.trim(),
-        targetSubjects: profileSubjects
-      });
-    }
-
-    setTimeout(() => {
+    try {
+      if (onUpdateProfile) {
+        await onUpdateProfile({
+          name: profileName.trim(),
+          bio: profileBio.trim(),
+          university: profileUniversity.trim(),
+          major: profileMajor.trim(),
+          semester: profileSemester.trim(),
+          learningGoal: profileLearningGoal.trim(),
+          photoURL: profilePhotoURL.trim(),
+          targetSubjects: profileSubjects,
+          aiExplanationStyle,
+          emailNotifications,
+          sessionReminders
+        });
+      }
+      showToast('Profile saved and synced to your personal account!');
+    } finally {
       setIsSaving(false);
-      showToast('Profile saved and synced successfully with Firebase!');
-    }, 400);
+    }
+  };
+
+  const handleSavePreferences = async () => {
+    setIsSaving(true);
+    try {
+      if (onUpdateProfile) {
+        await onUpdateProfile({
+          aiExplanationStyle,
+          emailNotifications,
+          sessionReminders
+        });
+      }
+      showToast('Preferences saved to your account.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleAddSubject = (e?: React.FormEvent) => {
@@ -262,7 +290,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                     <p className="text-xs text-slate-400 truncate sm:mt-3.5">{user.email}</p>
                     <p className="text-xs text-[#F6C62B] font-medium flex items-center justify-center sm:justify-start gap-1 truncate pt-0.5">
                       <School className="w-3.5 h-3.5 shrink-0" />
-                      <span className="truncate">{profileUniversity}</span>
+                      <span className="truncate">{profileUniversity || 'Set your school or university'}</span>
                     </p>
                   </div>
                 </div>
@@ -348,7 +376,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                       <Flame className="w-3.5 h-3.5 text-amber-400" />
                       <span>Study Streak</span>
                     </div>
-                    <div className="text-base font-bold text-white mt-0.5">{user.streakDays || 5} Days</div>
+                    <div className="text-base font-bold text-white mt-0.5">
+                      {user.streakDays} {user.streakDays === 1 ? 'Day' : 'Days'}
+                    </div>
                   </div>
 
                   <div className="p-2.5 rounded-xl bg-[#080f21] border border-slate-800/80">
@@ -356,7 +386,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                       <Trophy className="w-3.5 h-3.5 text-purple-400" />
                       <span>XP Progress</span>
                     </div>
-                    <div className="text-base font-bold text-white mt-0.5">{user.xpPoints || 840} XP</div>
+                    <div className="text-base font-bold text-white mt-0.5">{user.xpPoints} XP</div>
                   </div>
 
                   <div className="p-2.5 rounded-xl bg-[#080f21] border border-slate-800/80">
@@ -374,7 +404,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                       <Bot className="w-3.5 h-3.5 text-emerald-400" />
                       <span>AI Solutions</span>
                     </div>
-                    <div className="text-base font-bold text-white mt-0.5">24 Solved</div>
+                    <div className="text-base font-bold text-white mt-0.5">{user.questionsResolved} Solved</div>
                   </div>
                 </div>
 
@@ -664,50 +694,100 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
             )}
 
             {/* Sub-tab 3: Badges & Achievements */}
-            {activeTab === 'achievements' && (
-              <div className="bg-[#0c162e] border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-xl space-y-6">
-                <div className="border-b border-slate-800/80 pb-3 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-base font-bold text-white">Academic Badges & Milestones</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Earned through continuous problem-solving and live sessions on ProLnk.</p>
-                  </div>
-                  <span className="text-xs font-semibold text-emerald-400">5 Unlocked</span>
-                </div>
+            {activeTab === 'achievements' && (() => {
+              const marathonPct = Math.min(100, Math.round(((user.tutoringMinutes + user.questionsResolved * 15) / 1200) * 100));
+              const achievementsList = [
+                {
+                  title: 'First Step',
+                  desc: 'Created your personal ProLnk account and activated your student portal.',
+                  icon: CheckCircle2,
+                  unlocked: true,
+                  color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
+                  status: 'Unlocked'
+                },
+                {
+                  title: 'Unstoppable Streak',
+                  desc: 'Reach 5 consecutive days of study activity on your personal account.',
+                  icon: Flame,
+                  unlocked: user.streakDays >= 5,
+                  color: user.streakDays >= 5 ? 'text-amber-400 bg-amber-500/10 border-amber-500/30' : 'text-slate-400 bg-slate-800/50 border-slate-800',
+                  status: user.streakDays >= 5 ? 'Unlocked' : `${user.streakDays}/5 days`
+                },
+                {
+                  title: 'Live Mentorship',
+                  desc: 'Book or complete your first 1-on-1 tutoring session with a verified specialist.',
+                  icon: GraduationCap,
+                  unlocked: sessionsCount >= 1,
+                  color: sessionsCount >= 1 ? 'text-purple-400 bg-purple-500/10 border-purple-500/30' : 'text-slate-400 bg-slate-800/50 border-slate-800',
+                  status: sessionsCount >= 1 ? 'Unlocked' : '0/1 sessions'
+                },
+                {
+                  title: 'AI Problem Solver',
+                  desc: 'Solve 10 STEM problems step-by-step with the 24/7 AI Tutor.',
+                  icon: Bot,
+                  unlocked: user.questionsResolved >= 10,
+                  color: user.questionsResolved >= 10 ? 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30' : 'text-slate-400 bg-slate-800/50 border-slate-800',
+                  status: user.questionsResolved >= 10 ? 'Unlocked' : `${user.questionsResolved}/10 solved`
+                },
+                {
+                  title: 'Community Voice',
+                  desc: 'Publish a homework question in the Community Q&A board.',
+                  icon: MessageSquare,
+                  unlocked: user.forumPostsCount >= 1,
+                  color: user.forumPostsCount >= 1 ? 'text-teal-400 bg-teal-500/10 border-teal-500/30' : 'text-slate-400 bg-slate-800/50 border-slate-800',
+                  status: user.forumPostsCount >= 1 ? 'Unlocked' : '0/1 questions'
+                },
+                {
+                  title: 'Study Marathon',
+                  desc: 'Accumulate 20 active learning hours across tutoring and AI practice.',
+                  icon: Trophy,
+                  unlocked: marathonPct >= 100,
+                  color: marathonPct >= 100 ? 'text-amber-400 bg-amber-500/10 border-amber-500/30' : 'text-slate-400 bg-slate-800/50 border-slate-800',
+                  status: marathonPct >= 100 ? 'Unlocked' : `In progress (${marathonPct}%)`
+                }
+              ];
+              const unlockedCount = achievementsList.filter(a => a.unlocked).length;
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {[
-                    { title: 'First Step', desc: 'Registered your student account and configured your academic profile.', icon: CheckCircle2, color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30', status: 'Unlocked' },
-                    { title: 'Unstoppable Streak', desc: '5 consecutive days reviewing formula sheets and solving exercises.', icon: Flame, color: 'text-amber-400 bg-amber-500/10 border-amber-500/30', status: 'Unlocked' },
-                    { title: 'Live Mentorship', desc: 'Completed your first 1-on-1 virtual whiteboard session with a verified tutor.', icon: GraduationCap, color: 'text-purple-400 bg-purple-500/10 border-purple-500/30', status: 'Unlocked' },
-                    { title: 'AI Problem Solver', desc: 'Over 10 STEM problems solved with verified step-by-step textbook citations.', icon: Bot, color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30', status: 'Unlocked' },
-                    { title: 'Community Voice', desc: 'Posted a question in the student forum and received a verified breakdown.', icon: MessageSquare, color: 'text-teal-400 bg-teal-500/10 border-teal-500/30', status: 'Unlocked' },
-                    { title: 'Study Marathon', desc: 'Accumulate 20 active learning hours inside the ProLnk platform.', icon: Trophy, color: 'text-slate-400 bg-slate-800/50 border-slate-800', status: 'In progress (75%)' },
-                  ].map(ach => (
-                    <div
-                      key={ach.title}
-                      className="p-4 rounded-xl bg-[#080f21] border border-slate-800 flex items-start gap-3.5"
-                    >
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold border shrink-0 ${ach.color}`}>
-                        <ach.icon className="w-5 h-5" />
-                      </div>
-                      <div className="overflow-hidden space-y-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <h4 className="font-bold text-white text-sm truncate">{ach.title}</h4>
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
-                            ach.status.includes('Unlocked')
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                              : 'bg-slate-800 text-slate-400'
-                          }`}>
-                            {ach.status}
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-400 leading-relaxed">{ach.desc}</p>
-                      </div>
+              return (
+                <div className="bg-[#0c162e] border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-xl space-y-6">
+                  <div className="border-b border-slate-800/80 pb-3 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-base font-bold text-white">Academic Badges & Milestones</h3>
+                      <p className="text-xs text-slate-400 mt-0.5">Earned from your own sessions, AI problem-solving, and consistency on ProLnk.</p>
                     </div>
-                  ))}
+                    <span className="text-xs font-semibold text-emerald-400">
+                      {unlockedCount} / {achievementsList.length} Unlocked
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {achievementsList.map(ach => (
+                      <div
+                        key={ach.title}
+                        className="p-4 rounded-xl bg-[#080f21] border border-slate-800 flex items-start gap-3.5"
+                      >
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold border shrink-0 ${ach.color}`}>
+                          <ach.icon className="w-5 h-5" />
+                        </div>
+                        <div className="overflow-hidden space-y-1 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <h4 className="font-bold text-white text-sm truncate">{ach.title}</h4>
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded shrink-0 ${
+                              ach.unlocked
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                : 'bg-slate-800 text-slate-400'
+                            }`}>
+                              {ach.status}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-400 leading-relaxed">{ach.desc}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Sub-tab 4: AI & Study Preferences */}
             {activeTab === 'preferences' && (
@@ -808,12 +888,12 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
                 <div className="pt-4 border-t border-slate-800/80 flex justify-end">
                   <button
-                    onClick={() => {
-                      showToast('Preferences saved successfully.');
-                    }}
-                    className="px-6 py-2.5 bg-[#F6C62B] hover:bg-[#ffd744] text-slate-950 font-bold text-xs rounded-xl shadow-lg transition-all cursor-pointer hover:scale-102"
+                    type="button"
+                    disabled={isSaving}
+                    onClick={handleSavePreferences}
+                    className="px-6 py-2.5 bg-[#F6C62B] hover:bg-[#ffd744] disabled:opacity-50 text-slate-950 font-bold text-xs rounded-xl shadow-lg transition-all cursor-pointer hover:scale-102"
                   >
-                    Save Preferences
+                    {isSaving ? 'Saving...' : 'Save Preferences'}
                   </button>
                 </div>
               </div>

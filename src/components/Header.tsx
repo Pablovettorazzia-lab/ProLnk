@@ -6,7 +6,6 @@ import { PublicPage } from '../types';
 interface HeaderProps {
   onOpenTrialModal: () => void;
   onOpenLoginModal: () => void;
-  onEnterDemo?: () => void;
   currentUser?: { name: string; email: string } | null;
   onGoToDashboard?: () => void;
   isDarkMode?: boolean;
@@ -18,7 +17,6 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   onOpenTrialModal,
   onOpenLoginModal,
-  onEnterDemo,
   currentUser,
   onGoToDashboard,
   isDarkMode = false,
@@ -114,15 +112,6 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           ) : (
             <>
-              {onEnterDemo && (
-                <button
-                  type="button"
-                  onClick={onEnterDemo}
-                  className="text-xs font-semibold text-[#0F2249] hover:bg-amber-50 border border-slate-200/90 bg-white px-3 py-2 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
-                >
-                  Demo Portal
-                </button>
-              )}
               <button
                 type="button"
                 onClick={onOpenLoginModal}
@@ -230,18 +219,6 @@ export const Header: React.FC<HeaderProps> = ({
                   Log in
                 </button>
                 <div className="flex items-center gap-2">
-                  {onEnterDemo && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMobileMenuOpen(false);
-                        onEnterDemo();
-                      }}
-                      className="text-xs text-[#0F2249] font-semibold bg-[#FAFAF5] border border-slate-200 px-3 py-1.5 rounded-lg cursor-pointer"
-                    >
-                      Demo Portal
-                    </button>
-                  )}
                   <button
                     type="button"
                     onClick={() => {

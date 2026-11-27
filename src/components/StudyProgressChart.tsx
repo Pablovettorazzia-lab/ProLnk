@@ -32,12 +32,11 @@ interface DailyStudyPoint {
 type RangeFilter = 30 | 14 | 7;
 type ChartView = 'combined' | 'cumulative' | 'streak';
 
-function buildMonthlyStudyData(totalXpInput: number, currentStreakInput: number): DailyStudyPoint[] {
+function buildMonthlyStudyData(totalXpInput = 0, currentStreakInput = 0): DailyStudyPoint[] {
   const days = 30;
-  const currentStreak = Math.max(1, Math.min(days, Math.round(currentStreakInput || 5)));
-  const currentTotalXp = Math.max(120, Math.round(totalXpInput || 840));
+  const currentStreak = Math.max(0, Math.min(days, Math.round(currentStreakInput || 0)));
+  const currentTotalXp = Math.max(0, Math.round(totalXpInput || 0));
 
-  // Deterministic pattern for earlier days in the 30-day window (0 = rest day, >0 = study intensity weight)
   const baseWeights = [
     1.1, 1.3, 0.9, 0, 1.2, 1.5, 1.4, 1.0, 0, 0.8,
     1.3, 1.6, 1.2, 1.4, 1.1, 0, 1.0, 1.5, 1.7, 1.3,
@@ -49,14 +48,21 @@ function buildMonthlyStudyData(totalXpInput: number, currentStreakInput: number)
   const rawWeights: number[] = [];
 
   for (let i = 0; i < days; i++) {
-    if (i >= tailStartIndex) {
-      // Last `currentStreak` days are guaranteed active to match the current streak
+    if (currentTotalXp === 0) {
+      const isStreakDay = currentStreak > 0 && i >= tailStartIndex;
+      activeFlags.push(isStreakDay);
+      rawWeights.push(0);
+    } else if (currentStreak > 0 && i >= tailStartIndex) {
       activeFlags.push(true);
       rawWeights.push(baseWeights[i] > 0 ? baseWeights[i] : 1.3);
-    } else if (i === tailStartIndex - 1) {
-      // Day immediately before current streak started was a rest day so streak resets accurately
+    } else if (currentStreak > 0 && i === tailStartIndex - 1) {
       activeFlags.push(false);
       rawWeights.push(0);
+    } else if (currentTotalXp < 150) {
+      // Brand-new or low-XP accounts reflect activity concentrated in the most recent active days
+      const isToday = i === days - 1;
+      activeFlags.push(isToday);
+      rawWeights.push(isToday ? 1 : 0);
     } else {
       const w = baseWeights[i];
       activeFlags.push(w > 0);
@@ -64,8 +70,12 @@ function buildMonthlyStudyData(totalXpInput: number, currentStreakInput: number)
     }
   }
 
-  // Monthly XP gain accounts for ~65% of total lifetime XP (or all if small)
-  const monthlyGainBudget = Math.max(240, Math.round(currentTotalXp * 0.65));
+  const monthlyGainBudget =
+    currentTotalXp === 0
+      ? 0
+      : currentTotalXp < 150
+      ? currentTotalXp
+      : Math.round(currentTotalXp * 0.65);
   const startingXp = Math.max(0, currentTotalXp - monthlyGainBudget);
   const totalWeight = rawWeights.reduce((sum, w) => sum + w, 0) || 1;
 
@@ -73,6 +83,7 @@ function buildMonthlyStudyData(totalXpInput: number, currentStreakInput: number)
   let runningXp = startingXp;
   let runningStreak = 0;
   let allocatedGain = 0;
+  const lastActiveIdx = activeFlags.lastIndexOf(true);
 
   const points: DailyStudyPoint[] = [];
 
@@ -91,11 +102,11 @@ function buildMonthlyStudyData(totalXpInput: number, currentStreakInput: number)
     }
 
     let dailyXp = 0;
-    if (isActive) {
-      if (i === days - 1) {
-        dailyXp = Math.max(15, monthlyGainBudget - allocatedGain);
+    if (isActive && monthlyGainBudget > 0) {
+      if (i === lastActiveIdx) {
+        dailyXp = Math.max(0, monthlyGainBudget - allocatedGain);
       } else {
-        dailyXp = Math.max(15, Math.round((rawWeights[i] / totalWeight) * monthlyGainBudget));
+        dailyXp = Math.max(0, Math.round((rawWeights[i] / totalWeight) * monthlyGainBudget));
         allocatedGain += dailyXp;
       }
     }
@@ -106,7 +117,7 @@ function buildMonthlyStudyData(totalXpInput: number, currentStreakInput: number)
       dateLabel,
       fullDate,
       dailyXp,
-      cumulativeXp: i === days - 1 ? currentTotalXp : runningXp,
+      cumulativeXp: i === days - 1 ? currentTotalXp : Math.min(currentTotalXp, runningXp),
       streak: runningStreak,
       active: isActive
     });
@@ -153,9 +164,9 @@ const StudyChartTooltip: React.FC<{
 };
 
 export const StudyProgressChart: React.FC<StudyProgressChartProps> = ({
-  xpPoints = 840,
-  streakDays = 5,
-  sessionsCount = 3,
+  xpPoints = 0,
+  streakDays = 0,
+  sessionsCount = 0,
   isDarkMode = false
 }) => {
   const [range, setRange] = useState<RangeFilter>(30);
@@ -195,7 +206,7 @@ export const StudyProgressChart: React.FC<StudyProgressChartProps> = ({
             XP Gain & Streak History
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Past {range} days of study consistency across AI problem solving and {sessionsCount} tutoring sessions
+            Past {range} days of study consistency across AI problem solving and {sessionsCount} tutoring {sessionsCount === 1 ? 'session' : 'sessions'}
           </p>
         </div>
 
@@ -262,7 +273,7 @@ export const StudyProgressChart: React.FC<StudyProgressChartProps> = ({
             <span>Peak Streak</span>
           </div>
           <div className="text-lg font-bold text-slate-950 tabular-nums mt-1">
-            {summary.peakStreak} Days
+            {summary.peakStreak} {summary.peakStreak === 1 ? 'Day' : 'Days'}
           </div>
         </div>
 
@@ -366,7 +377,7 @@ export const StudyProgressChart: React.FC<StudyProgressChartProps> = ({
                 fontSize={11}
                 tickLine={false}
                 axisLine={false}
-                domain={['dataMin - 40', 'dataMax + 20']}
+                domain={[0, 'auto']}
               />
               <Tooltip content={<StudyChartTooltip />} />
               <Area

@@ -420,6 +420,18 @@ export const FORUM_POSTS: ForumPost[] = [
 
 export const USER_PAST_SESSIONS: DashboardSession[] = [
   {
+    id: 'sess-upcoming-1',
+    date: '26 Nov',
+    day: '26',
+    month: 'Nov',
+    topic: 'Cálculo diferencial · Regla de la cadena',
+    expertName: 'Daniela Ríos',
+    subject: 'Calculus',
+    tutorNotes: 'Sesión 1-a-1 confirmada. Lanza una sala de Google Meet o pega el enlace de tu tutor para conectarte.',
+    status: 'upcoming',
+    time: 'Mañana, 16:00 – 17:00'
+  },
+  {
     id: 'sess-1',
     date: '18 Sep',
     day: '18',

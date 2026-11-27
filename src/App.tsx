@@ -20,37 +20,68 @@ import { Footer } from './components/Footer';
 import { Dashboard } from './components/Dashboard';
 import { ProfilePage } from './components/ProfilePage';
 import { BookingModal, TrialModal, LoginModal, QuestionModal, ContactModal } from './components/Modals';
-import { Expert, ForumPost, DashboardSession, PublicPage } from './types';
-import { EXPERTS_DATA, USER_PAST_SESSIONS, FORUM_POSTS } from './data/mockData';
+import { AuthUser, Expert, ForumPost, DashboardSession, PublicPage, UserTask, SavedSketch } from './types';
+import { EXPERTS_DATA, FORUM_POSTS } from './data/mockData';
 import { CheckCircle2, X } from 'lucide-react';
 import { onAuthStatusChange, logoutUser } from './firebase/authService';
 import { auth } from './firebase/config';
 import {
+  UserProfileData,
   saveUserProfile,
   getUserProfile,
+  syncDailyStudyStreak,
+  updateUserStats,
+  getLocalDateKey,
   getUserSessions,
   saveUserSession,
+  updateUserSessionMeet,
+  updateUserSessionStatus,
+  getUserTasks,
+  saveUserTask,
+  toggleUserTask,
+  deleteUserTask,
+  getUserSketches,
+  saveUserSketch,
+  deleteUserSketch,
   getForumPosts,
   createForumPost,
   updatePostVotes
 } from './firebase/firestoreService';
 
-export interface AuthUser {
-  uid?: string;
-  name: string;
-  email: string;
-  photoURL?: string;
-  plan: string;
-  daysLeft: number;
-  bio?: string;
-  university?: string;
-  major?: string;
-  semester?: string;
-  targetSubjects?: string[];
-  learningGoal?: string;
-  streakDays?: number;
-  xpPoints?: number;
-  isDemo?: boolean;
+export type { AuthUser } from './types';
+
+function toAuthUser(
+  uid: string,
+  fallbackName: string,
+  fallbackEmail: string,
+  fallbackPhoto: string | undefined,
+  profile: UserProfileData | null,
+  extra?: { semester?: string }
+): AuthUser {
+  return {
+    uid,
+    name: profile?.name || fallbackName || 'Student',
+    email: profile?.email || fallbackEmail || '',
+    photoURL: profile?.photoURL?.trim() || fallbackPhoto?.trim() || undefined,
+    plan: profile?.plan || '3-Day Free Trial',
+    daysLeft: 3,
+    bio: profile?.bio || '',
+    university: profile?.university || '',
+    major: profile?.major || '',
+    semester: profile?.semester || extra?.semester || '',
+    targetSubjects: Array.isArray(profile?.targetSubjects) ? profile.targetSubjects : [],
+    learningGoal: profile?.learningGoal || '',
+    streakDays: typeof profile?.streakDays === 'number' ? profile.streakDays : 1,
+    xpPoints: typeof profile?.xpPoints === 'number' ? profile.xpPoints : 0,
+    questionsResolved: typeof profile?.questionsResolved === 'number' ? profile.questionsResolved : 0,
+    tutoringMinutes: typeof profile?.tutoringMinutes === 'number' ? profile.tutoringMinutes : 0,
+    notesSavedCount: typeof profile?.notesSavedCount === 'number' ? profile.notesSavedCount : 0,
+    forumPostsCount: typeof profile?.forumPostsCount === 'number' ? profile.forumPostsCount : 0,
+    lastActiveDate: profile?.lastActiveDate || getLocalDateKey(),
+    aiExplanationStyle: profile?.aiExplanationStyle === 'quick' ? 'quick' : 'detailed',
+    emailNotifications: typeof profile?.emailNotifications === 'boolean' ? profile.emailNotifications : true,
+    sessionReminders: typeof profile?.sessionReminders === 'boolean' ? profile.sessionReminders : true
+  };
 }
 
 export default function App() {
@@ -129,9 +160,13 @@ export default function App() {
     }
   };
 
-  // Firestore persistent state
-  const [userSessions, setUserSessions] = useState<DashboardSession[]>(USER_PAST_SESSIONS);
+  // Firestore persistent per-user state
+  const [userSessions, setUserSessions] = useState<DashboardSession[]>([]);
+  const [userTasks, setUserTasks] = useState<UserTask[]>([]);
+  const [userSketches, setUserSketches] = useState<SavedSketch[]>([]);
   const [communityPosts, setCommunityPosts] = useState<ForumPost[]>(FORUM_POSTS);
+  const currentUserRef = React.useRef<AuthUser | null>(null);
+  currentUserRef.current = currentUser;
 
   // Modals state
   const [trialModalOpen, setTrialModalOpen] = useState(false);
@@ -175,6 +210,17 @@ export default function App() {
     }, 4500);
   };
 
+  const loadUserPortalData = async (uid: string) => {
+    const [sessions, tasks, sketches] = await Promise.all([
+      getUserSessions(uid),
+      getUserTasks(uid),
+      getUserSketches(uid)
+    ]);
+    setUserSessions(sessions);
+    setUserTasks(tasks);
+    setUserSketches(sketches);
+  };
+
   // Sync with Firebase Auth and Firestore on mount
   useEffect(() => {
     getForumPosts()
@@ -188,35 +234,57 @@ export default function App() {
     const unsubscribe = onAuthStatusChange(async firebaseUser => {
       if (firebaseUser) {
         try {
-          const profile = await getUserProfile(firebaseUser.uid);
-          const user: AuthUser = {
-            uid: firebaseUser.uid,
-            name: profile?.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Student',
-            email: firebaseUser.email || '',
-            photoURL: profile?.photoURL?.trim() || undefined,
-            plan: profile?.plan || '3-Day Free Trial',
-            daysLeft: 3,
-            bio: profile?.bio || 'University student focused on mastering calculus and physics with ProLnk.',
-            university: profile?.university || 'Universidad del Valle de Guatemala',
-            major: profile?.major || 'Computer Science & Engineering',
-            semester: profile?.semester || '4th Semester',
-            targetSubjects: profile?.targetSubjects || ['Differential Calculus', 'Physics II', 'Linear Algebra'],
-            learningGoal: profile?.learningGoal || 'Maintain a GPA above 90 and master multivariable calculus.',
-            streakDays: profile?.streakDays ?? 5,
-            xpPoints: profile?.xpPoints ?? 840
-          };
+          let profile = await getUserProfile(firebaseUser.uid);
+
+          if (!profile) {
+            const initialProfile: UserProfileData = {
+              id: firebaseUser.uid,
+              name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Student',
+              email: firebaseUser.email || '',
+              photoURL: firebaseUser.photoURL?.trim() || '',
+              plan: '3-Day Free Trial',
+              role: 'student',
+              createdAt: new Date().toISOString(),
+              streakDays: 1,
+              xpPoints: 0,
+              questionsResolved: 0,
+              tutoringMinutes: 0,
+              notesSavedCount: 0,
+              forumPostsCount: 0,
+              lastActiveDate: getLocalDateKey(),
+              aiExplanationStyle: 'detailed',
+              emailNotifications: true,
+              sessionReminders: true
+            };
+            await saveUserProfile(initialProfile);
+            profile = initialProfile;
+          } else {
+            const streakUpdate = await syncDailyStudyStreak(firebaseUser.uid, profile);
+            profile = {
+              ...profile,
+              streakDays: streakUpdate.streakDays,
+              lastActiveDate: streakUpdate.lastActiveDate
+            };
+          }
+
+          const user = toAuthUser(
+            firebaseUser.uid,
+            firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Student',
+            firebaseUser.email || '',
+            firebaseUser.photoURL || undefined,
+            profile
+          );
           setCurrentUser(user);
 
-          const sessions = await getUserSessions(firebaseUser.uid);
-          if (sessions && sessions.length > 0) {
-            setUserSessions(sessions);
-          }
+          await loadUserPortalData(firebaseUser.uid);
         } catch (e) {
           handleServiceError(e);
         }
       } else {
-        setCurrentUser(prev => (prev?.isDemo ? prev : null));
-        setUserSessions(USER_PAST_SESSIONS);
+        setCurrentUser(null);
+        setUserSessions([]);
+        setUserTasks([]);
+        setUserSketches([]);
         try {
           localStorage.removeItem('prolnk_user');
         } catch {}
@@ -226,7 +294,13 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  const handleRegisterUser = async (name: string, email: string, uid?: string, photoURL?: string) => {
+  const handleRegisterUser = async (
+    name: string,
+    email: string,
+    uid?: string,
+    photoURL?: string,
+    extra?: { semester?: string }
+  ) => {
     const activeUid = uid || auth.currentUser?.uid;
     if (!activeUid) {
       showToast('Please complete Firebase sign-up to activate your account.');
@@ -234,26 +308,47 @@ export default function App() {
     }
 
     const cleanPhoto = photoURL?.trim() || undefined;
-    const newUser: AuthUser = {
-      uid: activeUid,
-      name: name || 'Student',
-      email: email,
-      photoURL: cleanPhoto,
-      plan: '3-Day Free Trial',
-      daysLeft: 3
-    };
+    let profile: UserProfileData | null = null;
+    try {
+      profile = await getUserProfile(activeUid);
+      if (!profile) {
+        const newProfile: UserProfileData = {
+          id: activeUid,
+          name: name || 'Student',
+          email,
+          photoURL: cleanPhoto ?? '',
+          plan: '3-Day Free Trial',
+          role: 'student',
+          createdAt: new Date().toISOString(),
+          semester: extra?.semester || '',
+          streakDays: 1,
+          xpPoints: 0,
+          questionsResolved: 0,
+          tutoringMinutes: 0,
+          notesSavedCount: 0,
+          forumPostsCount: 0,
+          lastActiveDate: getLocalDateKey(),
+          aiExplanationStyle: 'detailed',
+          emailNotifications: true,
+          sessionReminders: true
+        };
+        await saveUserProfile(newProfile);
+        profile = newProfile;
+      } else if (extra?.semester && !profile.semester) {
+        await saveUserProfile({ ...profile, semester: extra.semester });
+        profile = { ...profile, semester: extra.semester };
+      }
+    } catch (err) {
+      handleServiceError(err);
+    }
+
+    const newUser = toAuthUser(activeUid, name, email, cleanPhoto, profile, extra);
     setCurrentUser(newUser);
+    setTrialModalOpen(false);
+    setLoginModalOpen(false);
 
     try {
-      await saveUserProfile({
-        id: activeUid,
-        name: newUser.name,
-        email: newUser.email,
-        photoURL: cleanPhoto ?? '',
-        plan: newUser.plan,
-        role: 'student',
-        createdAt: new Date().toISOString()
-      });
+      await loadUserPortalData(activeUid);
     } catch (err) {
       handleServiceError(err);
     }
@@ -269,53 +364,50 @@ export default function App() {
       return;
     }
 
-    let existingProfile = null;
+    let existingProfile: UserProfileData | null = null;
     try {
       existingProfile = await getUserProfile(activeUid);
+      if (!existingProfile) {
+        const initialProfile: UserProfileData = {
+          id: activeUid,
+          name: name || 'Student',
+          email,
+          photoURL: photoURL?.trim() || '',
+          plan: '3-Day Free Trial',
+          role: 'student',
+          createdAt: new Date().toISOString(),
+          streakDays: 1,
+          xpPoints: 0,
+          questionsResolved: 0,
+          tutoringMinutes: 0,
+          notesSavedCount: 0,
+          forumPostsCount: 0,
+          lastActiveDate: getLocalDateKey(),
+          aiExplanationStyle: 'detailed',
+          emailNotifications: true,
+          sessionReminders: true
+        };
+        await saveUserProfile(initialProfile);
+        existingProfile = initialProfile;
+      } else {
+        const streakUpdate = await syncDailyStudyStreak(activeUid, existingProfile);
+        existingProfile = {
+          ...existingProfile,
+          streakDays: streakUpdate.streakDays,
+          lastActiveDate: streakUpdate.lastActiveDate
+        };
+      }
     } catch (err) {
       handleServiceError(err);
     }
 
-    const resolvedPhoto = photoURL?.trim() || existingProfile?.photoURL?.trim() || undefined;
-    const user: AuthUser = {
-      uid: activeUid,
-      name: existingProfile?.name || name || 'Student',
-      email: email,
-      photoURL: resolvedPhoto,
-      plan: existingProfile?.plan || '3-Day Free Trial',
-      daysLeft: 3,
-      bio: existingProfile?.bio,
-      university: existingProfile?.university,
-      major: existingProfile?.major,
-      semester: existingProfile?.semester,
-      targetSubjects: existingProfile?.targetSubjects,
-      learningGoal: existingProfile?.learningGoal,
-      streakDays: existingProfile?.streakDays ?? 5,
-      xpPoints: existingProfile?.xpPoints ?? 840
-    };
+    const user = toAuthUser(activeUid, name, email, photoURL, existingProfile);
     setCurrentUser(user);
-
-    if (!existingProfile) {
-      try {
-        await saveUserProfile({
-          id: activeUid,
-          name: user.name,
-          email: user.email,
-          photoURL: resolvedPhoto ?? '',
-          plan: user.plan,
-          role: 'student',
-          createdAt: new Date().toISOString()
-        });
-      } catch (err) {
-        handleServiceError(err);
-      }
-    }
+    setTrialModalOpen(false);
+    setLoginModalOpen(false);
 
     try {
-      const sessions = await getUserSessions(activeUid);
-      if (sessions && sessions.length > 0) {
-        setUserSessions(sessions);
-      }
+      await loadUserPortalData(activeUid);
     } catch (err) {
       handleServiceError(err);
     }
@@ -324,36 +416,14 @@ export default function App() {
     showToast(`Welcome back, ${user.name}!`);
   };
 
-  const handleEnterDemoPortal = () => {
-    const demoUser: AuthUser = {
-      uid: 'demo-student-pablo',
-      name: 'Pablo Vettorazzi',
-      email: 'Pablovettorazzia@hotmail.com',
-      plan: 'Plus Plan (Demo)',
-      daysLeft: 14,
-      bio: 'University student focused on mastering multivariable calculus, physics, and computer science on ProLnk.',
-      university: 'Universidad del Valle de Guatemala',
-      major: 'Computer Science & Engineering',
-      semester: '4th Semester',
-      targetSubjects: ['Multivariable Calculus', 'Physics II', 'Linear Algebra'],
-      learningGoal: 'Master integration techniques and maintain a GPA above 90.',
-      streakDays: 12,
-      xpPoints: 1420,
-      isDemo: true
-    };
-    setCurrentUser(demoUser);
-    setUserSessions(USER_PAST_SESSIONS);
-    setLoginModalOpen(false);
-    setTrialModalOpen(false);
-    setCurrentView('dashboard');
-    showToast('Entered Demo Portal as Pablo Vettorazzi. All features unlocked!');
-  };
-
   const handleLogOut = async () => {
     try {
       await logoutUser();
     } catch {}
     setCurrentUser(null);
+    setUserSessions([]);
+    setUserTasks([]);
+    setUserSketches([]);
     setCurrentView('landing');
     try {
       localStorage.removeItem('prolnk_user');
@@ -394,6 +464,186 @@ export default function App() {
     showToast(`Session booked with ${details.expertName} for Q${details.total}! Check your portal for the room link.`);
   };
 
+  const handleAwardActivity = async (deltas: {
+    xpDelta?: number;
+    questionsDelta?: number;
+    tutoringMinutesDelta?: number;
+  }) => {
+    const active = currentUserRef.current;
+    if (!active?.uid) return;
+
+    const today = getLocalDateKey();
+    const nextXp = active.xpPoints + (deltas.xpDelta || 0);
+    const nextQuestions = active.questionsResolved + (deltas.questionsDelta || 0);
+    const nextMinutes = active.tutoringMinutes + (deltas.tutoringMinutesDelta || 0);
+
+    const updatedUser: AuthUser = {
+      ...active,
+      xpPoints: nextXp,
+      questionsResolved: nextQuestions,
+      tutoringMinutes: nextMinutes,
+      lastActiveDate: today
+    };
+    currentUserRef.current = updatedUser;
+    setCurrentUser(updatedUser);
+
+    if (auth.currentUser?.uid === active.uid) {
+      try {
+        await updateUserStats(active.uid, {
+          xpPoints: nextXp,
+          questionsResolved: nextQuestions,
+          tutoringMinutes: nextMinutes,
+          lastActiveDate: today
+        });
+      } catch (err) {
+        handleServiceError(err);
+      }
+    }
+  };
+
+  const handleAttachMeetToSession = async (
+    sessionId: string,
+    space: { meetingUri: string; meetingCode?: string }
+  ) => {
+    setUserSessions(prev =>
+      prev.map(s =>
+        s.id === sessionId
+          ? {
+              ...s,
+              meetUri: space.meetingUri,
+              meetCode: space.meetingCode
+            }
+          : s
+      )
+    );
+
+    const activeUid = currentUserRef.current?.uid;
+    if (activeUid && auth.currentUser?.uid === activeUid) {
+      try {
+        await updateUserSessionMeet(activeUid, sessionId, space.meetingUri, space.meetingCode);
+      } catch (err) {
+        handleServiceError(err);
+      }
+    }
+  };
+
+  const handleCompleteSession = async (sessionId: string) => {
+    const existing = userSessions.find(s => s.id === sessionId);
+    if (!existing || existing.status === 'completed') return;
+
+    setUserSessions(prev =>
+      prev.map(s => (s.id === sessionId ? { ...s, status: 'completed' } : s))
+    );
+
+    const activeUid = currentUserRef.current?.uid;
+    if (activeUid && auth.currentUser?.uid === activeUid) {
+      try {
+        await updateUserSessionStatus(activeUid, sessionId, 'completed');
+      } catch (err) {
+        handleServiceError(err);
+      }
+    }
+
+    await handleAwardActivity({ xpDelta: 80, tutoringMinutesDelta: 60 });
+    showToast('Session marked as completed! +60 min & +80 XP added to your account.');
+  };
+
+  const handleAddTask = async (task: UserTask) => {
+    setUserTasks(prev => [task, ...prev]);
+    const activeUid = currentUserRef.current?.uid;
+    if (activeUid && auth.currentUser?.uid === activeUid) {
+      try {
+        await saveUserTask(activeUid, task);
+      } catch (err) {
+        handleServiceError(err);
+      }
+    }
+  };
+
+  const handleToggleTask = async (taskId: string, completed: boolean) => {
+    setUserTasks(prev => prev.map(t => (t.id === taskId ? { ...t, completed } : t)));
+    const activeUid = currentUserRef.current?.uid;
+    if (activeUid && auth.currentUser?.uid === activeUid) {
+      try {
+        await toggleUserTask(activeUid, taskId, completed);
+        if (completed) {
+          await handleAwardActivity({ xpDelta: 15 });
+        }
+      } catch (err) {
+        handleServiceError(err);
+      }
+    }
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    setUserTasks(prev => prev.filter(t => t.id !== taskId));
+    const activeUid = currentUserRef.current?.uid;
+    if (activeUid && auth.currentUser?.uid === activeUid) {
+      try {
+        await deleteUserTask(activeUid, taskId);
+      } catch (err) {
+        handleServiceError(err);
+      }
+    }
+  };
+
+  const handleSaveSketch = async (sketch: SavedSketch) => {
+    let nextCount = userSketches.length + 1;
+    setUserSketches(prev => {
+      const exists = prev.some(s => s.id === sketch.id);
+      const next = exists ? prev.map(s => (s.id === sketch.id ? sketch : s)) : [sketch, ...prev];
+      nextCount = next.length;
+      return next;
+    });
+
+    const active = currentUserRef.current;
+    if (active?.uid && auth.currentUser?.uid === active.uid) {
+      const nextXp = active.xpPoints + 10;
+      const updatedUser: AuthUser = {
+        ...active,
+        notesSavedCount: nextCount,
+        xpPoints: nextXp,
+        lastActiveDate: getLocalDateKey()
+      };
+      currentUserRef.current = updatedUser;
+      setCurrentUser(updatedUser);
+
+      try {
+        await saveUserSketch(active.uid, sketch);
+        await updateUserStats(active.uid, {
+          notesSavedCount: nextCount,
+          xpPoints: nextXp,
+          lastActiveDate: getLocalDateKey()
+        });
+      } catch (err) {
+        handleServiceError(err);
+      }
+    }
+  };
+
+  const handleDeleteSketch = async (sketchId: string) => {
+    let nextCount = Math.max(0, userSketches.length - 1);
+    setUserSketches(prev => {
+      const next = prev.filter(s => s.id !== sketchId);
+      nextCount = next.length;
+      return next;
+    });
+
+    const active = currentUserRef.current;
+    if (active?.uid && auth.currentUser?.uid === active.uid) {
+      const updatedUser: AuthUser = { ...active, notesSavedCount: nextCount };
+      currentUserRef.current = updatedUser;
+      setCurrentUser(updatedUser);
+
+      try {
+        await deleteUserSketch(active.uid, sketchId);
+        await updateUserStats(active.uid, { notesSavedCount: nextCount });
+      } catch (err) {
+        handleServiceError(err);
+      }
+    }
+  };
+
   const handleSelectPlan = (_planName: string, _price: string) => {
     if (!currentUser) {
       setTrialModalOpen(true);
@@ -403,25 +653,41 @@ export default function App() {
     }
   };
 
-  const handlePostQuestion = async (title: string, category: string) => {
+  const handlePostQuestion = async (title: string, category: string, previewText?: string) => {
+    const active = currentUserRef.current;
     const newPost: ForumPost = {
       id: `post-${Date.now()}`,
       title,
-      author: currentUser ? `${currentUser.name} (Student)` : 'Guest Student',
+      author: active ? `${active.name} (Student)` : 'Guest Student',
       category,
       repliesCount: 0,
       votes: 1,
       userVoted: true,
       hasExpertAnswer: false,
-      previewText: 'Awaiting first community or expert breakdown...',
+      previewText: previewText?.trim() || 'Awaiting first community or expert breakdown...',
       timeAgo: 'Just now'
     };
 
     setCommunityPosts(prev => [newPost, ...prev]);
 
-    if (currentUser?.uid && auth.currentUser?.uid === currentUser.uid) {
+    if (active?.uid && auth.currentUser?.uid === active.uid) {
       try {
-        await createForumPost(newPost, currentUser.uid);
+        await createForumPost(newPost, active.uid);
+        const nextPostsCount = active.forumPostsCount + 1;
+        const nextXp = active.xpPoints + 20;
+        const updatedUser: AuthUser = {
+          ...active,
+          forumPostsCount: nextPostsCount,
+          xpPoints: nextXp,
+          lastActiveDate: getLocalDateKey()
+        };
+        currentUserRef.current = updatedUser;
+        setCurrentUser(updatedUser);
+        await updateUserStats(active.uid, {
+          forumPostsCount: nextPostsCount,
+          xpPoints: nextXp,
+          lastActiveDate: getLocalDateKey()
+        });
         showToast(`Your question in ${category} was posted to the community!`);
       } catch (err) {
         handleServiceError(err);
@@ -459,18 +725,20 @@ export default function App() {
   };
 
   const handleUpdateProfile = async (updatedData: Partial<AuthUser>) => {
-    if (!currentUser) return;
+    const active = currentUserRef.current;
+    if (!active) return;
     const normalizedPhoto =
       'photoURL' in updatedData
         ? updatedData.photoURL?.trim() || undefined
-        : currentUser.photoURL;
-    const updated: AuthUser = { ...currentUser, ...updatedData, photoURL: normalizedPhoto };
+        : active.photoURL;
+    const updated: AuthUser = { ...active, ...updatedData, photoURL: normalizedPhoto };
+    currentUserRef.current = updated;
     setCurrentUser(updated);
 
-    if (currentUser.uid && auth.currentUser?.uid === currentUser.uid) {
+    if (active.uid && auth.currentUser?.uid === active.uid) {
       try {
         await saveUserProfile({
-          id: currentUser.uid,
+          id: active.uid,
           name: updated.name,
           email: updated.email,
           photoURL: 'photoURL' in updatedData ? updatedData.photoURL?.trim() || '' : updated.photoURL,
@@ -484,7 +752,15 @@ export default function App() {
           targetSubjects: updated.targetSubjects,
           learningGoal: updated.learningGoal,
           streakDays: updated.streakDays,
-          xpPoints: updated.xpPoints
+          xpPoints: updated.xpPoints,
+          questionsResolved: updated.questionsResolved,
+          tutoringMinutes: updated.tutoringMinutes,
+          notesSavedCount: updated.notesSavedCount,
+          forumPostsCount: updated.forumPostsCount,
+          lastActiveDate: updated.lastActiveDate,
+          aiExplanationStyle: updated.aiExplanationStyle,
+          emailNotifications: updated.emailNotifications,
+          sessionReminders: updated.sessionReminders
         });
       } catch (err) {
         handleServiceError(err);
@@ -529,11 +805,22 @@ export default function App() {
         <Dashboard
           user={currentUser}
           sessions={userSessions}
+          tasks={userTasks}
+          sketches={userSketches}
           posts={communityPosts}
           onVotePost={handleVoteQuestion}
+          onPostQuestion={handlePostQuestion}
+          onAddTask={handleAddTask}
+          onToggleTask={handleToggleTask}
+          onDeleteTask={handleDeleteTask}
+          onSaveSketch={handleSaveSketch}
+          onDeleteSketch={handleDeleteSketch}
+          onCompleteSession={handleCompleteSession}
+          onAwardActivity={handleAwardActivity}
           onLogOut={handleLogOut}
           onViewLandingPage={() => {}}
           onBookExpert={handleBookExpert}
+          onAttachMeetToSession={handleAttachMeetToSession}
           onUpdateProfile={handleUpdateProfile}
           onOpenProfile={() => setCurrentView('profile')}
           isDarkMode={isDarkMode}
@@ -572,7 +859,6 @@ export default function App() {
       <Header
         onOpenTrialModal={() => setTrialModalOpen(true)}
         onOpenLoginModal={() => setLoginModalOpen(true)}
-        onEnterDemo={handleEnterDemoPortal}
         currentUser={currentUser}
         onGoToDashboard={() => setCurrentView('dashboard')}
         isDarkMode={isDarkMode}
@@ -689,13 +975,14 @@ export default function App() {
           setTrialInitialEmail('');
         }}
         onRegister={handleRegisterUser}
+        onLogin={handleLoginUser}
       />
 
       <LoginModal
         isOpen={loginModalOpen}
         onClose={() => setLoginModalOpen(false)}
         onLogin={handleLoginUser}
-        onEnterDemo={handleEnterDemoPortal}
+        onRegister={handleRegisterUser}
       />
 
       <QuestionModal

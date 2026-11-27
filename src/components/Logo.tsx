@@ -29,7 +29,7 @@ export const ProLnkLogo: React.FC<LogoProps> = ({
       <img
         src={logoImg}
         alt="ProLnk Logo"
-        className={`${mark} object-contain shrink-0 transition-transform duration-200 hover:scale-105 drop-shadow-sm`}
+        className={`${mark} object-contain shrink-0 transition-transform duration-200 hover:scale-105`}
         loading="eager"
       />
 

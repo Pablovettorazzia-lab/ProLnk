@@ -36,13 +36,20 @@ service cloud.firestore {
       return !(key in data) || (data[key] is number && data[key] >= minVal && data[key] <= maxVal);
     }
 
+    function isOptionalBool(data, key) {
+      return !(key in data) || data[key] is bool;
+    }
+
     // Entity Validation Blueprints
     function isValidUserProfile(data) {
       return data.keys().hasAll(['id', 'name', 'email', 'plan', 'role', 'createdAt', 'updatedAt'])
         && data.keys().hasOnly([
           'id', 'name', 'email', 'photoURL', 'plan', 'role',
           'bio', 'university', 'major', 'semester', 'targetSubjects',
-          'learningGoal', 'streakDays', 'xpPoints', 'createdAt', 'updatedAt'
+          'learningGoal', 'streakDays', 'xpPoints', 'questionsResolved',
+          'tutoringMinutes', 'notesSavedCount', 'forumPostsCount',
+          'lastActiveDate', 'aiExplanationStyle', 'emailNotifications',
+          'sessionReminders', 'createdAt', 'updatedAt'
         ])
         && isValidId(data.id)
         && data.name is string && data.name.size() >= 1 && data.name.size() <= 100
@@ -57,6 +64,14 @@ service cloud.firestore {
         && isOptionalString(data, 'learningGoal', 500)
         && isOptionalNumber(data, 'streakDays', 0, 100000)
         && isOptionalNumber(data, 'xpPoints', 0, 10000000)
+        && isOptionalNumber(data, 'questionsResolved', 0, 1000000)
+        && isOptionalNumber(data, 'tutoringMinutes', 0, 1000000)
+        && isOptionalNumber(data, 'notesSavedCount', 0, 100000)
+        && isOptionalNumber(data, 'forumPostsCount', 0, 100000)
+        && isOptionalString(data, 'lastActiveDate', 40)
+        && (!('aiExplanationStyle' in data) || (data.aiExplanationStyle is string && data.aiExplanationStyle in ['detailed', 'quick']))
+        && isOptionalBool(data, 'emailNotifications')
+        && isOptionalBool(data, 'sessionReminders')
         && (!('targetSubjects' in data) || (
           data.targetSubjects is list
           && data.targetSubjects.size() <= 20
@@ -71,7 +86,7 @@ service cloud.firestore {
         && data.keys().hasOnly([
           'id', 'userId', 'expertId', 'expertName', 'subject', 'topic',
           'date', 'day', 'month', 'time', 'total', 'status',
-          'tutorNotes', 'urgentUsed', 'createdAt', 'updatedAt'
+          'tutorNotes', 'urgentUsed', 'meetUri', 'meetCode', 'createdAt', 'updatedAt'
         ])
         && isValidId(data.id)
         && isValidId(data.userId)
@@ -86,7 +101,25 @@ service cloud.firestore {
         && isOptionalNumber(data, 'total', 0, 100000)
         && data.status is string && data.status in ['upcoming', 'confirmed', 'completed', 'cancelled']
         && isOptionalString(data, 'tutorNotes', 1000)
-        && (!('urgentUsed' in data) || data.urgentUsed is bool)
+        && isOptionalBool(data, 'urgentUsed')
+        && isOptionalString(data, 'meetUri', 300)
+        && isOptionalString(data, 'meetCode', 60)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUserTask(data) {
+      return data.keys().hasAll(['id', 'userId', 'title', 'subject', 'dueDate', 'completed', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly([
+          'id', 'userId', 'title', 'subject', 'dueDate', 'completed', 'urgency', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && isValidId(data.userId)
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 240
+        && data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 80
+        && data.dueDate is string && data.dueDate.size() >= 1 && data.dueDate.size() <= 80
+        && data.completed is bool
+        && (!('urgency' in data) || (data.urgency is string && data.urgency in ['high', 'medium', 'low']))
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
     }
@@ -157,7 +190,10 @@ service cloud.firestore {
         && incoming().diff(existing()).affectedKeys().hasOnly([
           'name', 'photoURL', 'plan', 'bio', 'university', 'major',
           'semester', 'targetSubjects', 'learningGoal', 'streakDays',
-          'xpPoints', 'updatedAt'
+          'xpPoints', 'questionsResolved', 'tutoringMinutes',
+          'notesSavedCount', 'forumPostsCount', 'lastActiveDate',
+          'aiExplanationStyle', 'emailNotifications', 'sessionReminders',
+          'updatedAt'
         ]);
       allow delete: if isOwner(userId) && isValidId(userId);
 
@@ -185,9 +221,36 @@ service cloud.firestore {
           && incoming().updatedAt == request.time
           && incoming().diff(existing()).affectedKeys().hasOnly([
             'topic', 'date', 'day', 'month', 'time', 'status',
-            'tutorNotes', 'urgentUsed', 'updatedAt'
+            'tutorNotes', 'urgentUsed', 'meetUri', 'meetCode', 'updatedAt'
           ]);
         allow delete: if isOwner(userId) && isValidId(userId) && isValidId(sessionId);
+      }
+
+      // Private assignment tasks (Master Gate enforces existing parent user profile)
+      match /tasks/{taskId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(taskId);
+        allow list: if isOwner(userId) && existing().userId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(taskId)
+          && isValidUserTask(incoming())
+          && incoming().id == taskId
+          && incoming().userId == userId
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/users/$(userId));
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(taskId)
+          && isValidUserTask(incoming())
+          && incoming().id == existing().id
+          && incoming().userId == existing().userId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'title', 'subject', 'dueDate', 'completed', 'urgency', 'updatedAt'
+          ]);
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(taskId);
       }
 
       // Private whiteboard sketches (Master Gate enforces existing parent user profile)

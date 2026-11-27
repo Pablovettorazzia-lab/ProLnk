@@ -1,13 +1,74 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ProLnkLogo } from './Logo';
-import { Expert, ForumPost, ForumComment, DashboardSession, StudyDocumentPayload, VerifiedSource } from '../types';
-import { EXPERTS_DATA, FORUM_POSTS, USER_PAST_SESSIONS, AI_PRESET_QUESTIONS } from '../data/mockData';
+import { AuthUser, Expert, ForumPost, ForumComment, DashboardSession, StudyDocumentPayload, VerifiedSource, UserTask, SavedSketch } from '../types';
+import { EXPERTS_DATA, FORUM_POSTS, AI_PRESET_QUESTIONS } from '../data/mockData';
 import { WhiteboardCanvas } from './WhiteboardCanvas';
 import { VerifiedSourcesBar } from './VerifiedSourcesBar';
 import { GoogleChatPanel } from './GoogleChatPanel';
 import { GoogleClassroomPanel } from './GoogleClassroomPanel';
+import { GoogleMeetPanel } from './GoogleMeetPanel';
+import { GoogleMeetModal } from './GoogleMeetModal';
 import { UserAvatar } from './UserAvatar';
+import { pickNextVariantIndex } from './Modals';
 import { readStudyFile, formatFileSize, MAX_STUDY_FILES } from '../utils/studyFiles';
+
+const DASHBOARD_PLANS_PHRASES = [
+  {
+    badge: 'Planes ProLnk',
+    line1: 'Un plan para',
+    line2: 'cada ritmo.',
+    accent: 'Sin ataduras.',
+    desc: 'Combina tutorías humanas 1-a-1, pizarra compartida e IA 24/7 según tus exámenes del mes.'
+  },
+  {
+    badge: 'Tu ritmo importa',
+    line1: 'Crece según',
+    line2: 'tu semestre.',
+    accent: 'Cambia cuando quieras.',
+    desc: 'Sube o ajusta tu plan en segundos cuando lleguen parciales, laboratorios o proyectos finales.'
+  },
+  {
+    badge: 'Más claridad',
+    line1: 'Invierte en',
+    line2: 'entender mejor.',
+    accent: 'Cero complicaciones.',
+    desc: 'Horas flexibles con tutores verificados, historial de pizarra y dudas ilimitadas en Plus.'
+  },
+  {
+    badge: 'Acompañamiento real',
+    line1: 'Elige cuánto',
+    line2: 'apoyo necesitas.',
+    accent: 'Todo transparente.',
+    desc: 'Precios claros desde el primer día y herramientas listas para impulsar tu promedio.'
+  }
+];
+
+const DASHBOARD_HELP_PHRASES = [
+  {
+    badge: 'Ayuda y soporte',
+    line1: 'Siempre tienes',
+    line2: 'respaldo aquí.',
+    accent: 'Nunca estudies solo.'
+  },
+  {
+    badge: 'Guía rápida',
+    line1: '¿Te trabaste',
+    line2: 'en algo hoy?',
+    accent: 'Lo resolvemos juntos.'
+  },
+  {
+    badge: 'Soporte 24/7',
+    line1: 'De la duda',
+    line2: 'a la solución.',
+    accent: 'En un par de clics.'
+  },
+  {
+    badge: 'Contigo siempre',
+    line1: 'IA o tutoría,',
+    line2: 'tú decides.',
+    accent: 'Estamos disponibles.'
+  }
+];
 import {
   Home,
   Bot,
@@ -61,33 +122,31 @@ import {
   BarChart2,
   FlaskConical,
   Code2,
-  ArrowRight
+  ArrowRight,
+  Link2,
+  Copy
 } from 'lucide-react';
 
 interface DashboardProps {
-  user: {
-    uid?: string;
-    name: string;
-    email: string;
-    photoURL?: string;
-    plan: string;
-    daysLeft: number;
-    bio?: string;
-    university?: string;
-    major?: string;
-    semester?: string;
-    targetSubjects?: string[];
-    learningGoal?: string;
-    streakDays?: number;
-    xpPoints?: number;
-  };
+  user: AuthUser;
   sessions?: DashboardSession[];
+  tasks?: UserTask[];
+  sketches?: SavedSketch[];
   posts?: ForumPost[];
   onVotePost?: (postId: string) => void;
+  onPostQuestion?: (title: string, category: string, previewText?: string) => Promise<void> | void;
+  onAddTask?: (task: UserTask) => Promise<void> | void;
+  onToggleTask?: (taskId: string, completed: boolean) => Promise<void> | void;
+  onDeleteTask?: (taskId: string) => Promise<void> | void;
+  onSaveSketch?: (sketch: SavedSketch) => Promise<void> | void;
+  onDeleteSketch?: (sketchId: string) => Promise<void> | void;
+  onCompleteSession?: (sessionId: string) => Promise<void> | void;
+  onAwardActivity?: (deltas: { xpDelta?: number; questionsDelta?: number; tutoringMinutesDelta?: number }) => Promise<void> | void;
   onLogOut: () => void;
   onViewLandingPage: () => void;
   onBookExpert: (expert: Expert) => void;
-  onUpdateProfile?: (updated: Partial<DashboardProps['user']>) => void;
+  onAttachMeetToSession?: (sessionId: string, space: { meetingUri: string; meetingCode?: string }) => void;
+  onUpdateProfile?: (updated: Partial<AuthUser>) => void;
   onOpenProfile?: () => void;
   isDarkMode?: boolean;
   onToggleDarkMode?: () => void;
@@ -96,17 +155,27 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({
   user,
   sessions: propSessions,
+  tasks: propTasks,
+  sketches: propSketches,
   posts: propPosts,
   onVotePost,
+  onPostQuestion,
+  onAddTask,
+  onToggleTask,
+  onDeleteTask,
+  onSaveSketch,
+  onDeleteSketch,
+  onCompleteSession,
+  onAwardActivity,
   onLogOut,
-  onViewLandingPage,
   onBookExpert,
+  onAttachMeetToSession,
   onUpdateProfile,
   onOpenProfile,
   isDarkMode,
   onToggleDarkMode
 }) => {
-  const [activeTab, setActiveTab] = useState<'home' | 'ai-chat' | 'tutors' | 'sessions' | 'community' | 'google-chat' | 'google-classroom' | 'notes' | 'profile'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'ai-chat' | 'tutors' | 'sessions' | 'community' | 'google-chat' | 'google-classroom' | 'google-meet' | 'notes' | 'profile'>('home');
   const [notesSubTab, setNotesSubTab] = useState<'canvas' | 'downloads'>('canvas');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
@@ -116,9 +185,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [plansModalOpen, setPlansModalOpen] = useState(false);
   const [helpModalOpen, setHelpModalOpen] = useState(false);
+  const [plansPhraseIdx, setPlansPhraseIdx] = useState(0);
+  const [helpPhraseIdx, setHelpPhraseIdx] = useState(0);
+  const [meetModalOpen, setMeetModalOpen] = useState(false);
+  const [meetModalSession, setMeetModalSession] = useState<DashboardSession | null>(null);
+  const [meetModalMode, setMeetModalMode] = useState<'launch' | 'join'>('launch');
+  const [sessionMeetOverrides, setSessionMeetOverrides] = useState<
+    Record<string, { meetingUri: string; meetingCode?: string }>
+  >({});
+  const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
   const searchBoxRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
   const accountMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (plansModalOpen) {
+      setPlansPhraseIdx(pickNextVariantIndex('dash_plans', DASHBOARD_PLANS_PHRASES.length));
+    }
+  }, [plansModalOpen]);
+
+  useEffect(() => {
+    if (helpModalOpen) {
+      setHelpPhraseIdx(pickNextVariantIndex('dash_help', DASHBOARD_HELP_PHRASES.length));
+    }
+  }, [helpModalOpen]);
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
@@ -152,28 +242,24 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // Profile state synced from authenticated user
   const [profileName, setProfileName] = useState(user.name || '');
-  const [profileBio, setProfileBio] = useState(user.bio || 'Estudiante universitario apasionado por dominar cálculo y materias STEM con apoyo de ProLnk.');
-  const [profileUniversity, setProfileUniversity] = useState(user.university || 'Universidad del Valle de Guatemala');
-  const [profileMajor, setProfileMajor] = useState(user.major || 'Ingeniería en Ciencias de la Computación');
-  const [profileSemester, setProfileSemester] = useState(user.semester || '4to Semestre');
-  const [profileLearningGoal, setProfileLearningGoal] = useState(user.learningGoal || 'Dominar derivadas e integrales y mantener promedio superior a 90.');
+  const [profileBio, setProfileBio] = useState(user.bio || '');
+  const [profileUniversity, setProfileUniversity] = useState(user.university || '');
+  const [profileMajor, setProfileMajor] = useState(user.major || '');
+  const [profileSemester, setProfileSemester] = useState(user.semester || '');
+  const [profileLearningGoal, setProfileLearningGoal] = useState(user.learningGoal || '');
   const [profilePhotoURL, setProfilePhotoURL] = useState(user.photoURL || '');
-  const [profileSubjects, setProfileSubjects] = useState<string[]>(
-    user.targetSubjects && user.targetSubjects.length > 0
-      ? user.targetSubjects
-      : ['Cálculo Multivariable', 'Física II', 'Álgebra Lineal']
-  );
+  const [profileSubjects, setProfileSubjects] = useState<string[]>(user.targetSubjects || []);
 
   // Sync profile state when user prop updates
   useEffect(() => {
-    if (user.name) setProfileName(user.name);
-    if (user.bio) setProfileBio(user.bio);
-    if (user.university) setProfileUniversity(user.university);
-    if (user.major) setProfileMajor(user.major);
-    if (user.semester) setProfileSemester(user.semester);
-    if (user.learningGoal) setProfileLearningGoal(user.learningGoal);
+    setProfileName(user.name || '');
+    setProfileBio(user.bio || '');
+    setProfileUniversity(user.university || '');
+    setProfileMajor(user.major || '');
+    setProfileSemester(user.semester || '');
+    setProfileLearningGoal(user.learningGoal || '');
     setProfilePhotoURL(user.photoURL || '');
-    if (user.targetSubjects) setProfileSubjects(user.targetSubjects);
+    setProfileSubjects(user.targetSubjects || []);
   }, [user]);
 
   const _unusedProfileRefs = {
@@ -259,48 +345,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
   
-  // Homework Tasks Planner state
-  const [tasks, setTasks] = useState<{
-    id: string;
-    title: string;
-    subject: string;
-    dueDate: string;
-    completed: boolean;
-    urgency: 'high' | 'medium' | 'low';
-  }[]>([
-    {
-      id: 'hw-1',
-      title: 'Calculus: Section 7.2 Exercises 14 to 28 (Integration by Parts)',
-      subject: 'Calculus',
-      dueDate: 'Tomorrow, 11:59 PM',
-      completed: false,
-      urgency: 'high'
-    },
-    {
-      id: 'hw-2',
-      title: 'Physics: 2D Collisions & Momentum Lab Data Table',
-      subject: 'Physics',
-      dueDate: 'Friday, Oct 6',
-      completed: false,
-      urgency: 'medium'
-    },
-    {
-      id: 'hw-3',
-      title: 'Chemistry: Redox Half-Reactions in Acidic Media Worksheet',
-      subject: 'Chemistry',
-      dueDate: 'Sunday, Oct 8',
-      completed: true,
-      urgency: 'low'
-    },
-    {
-      id: 'hw-4',
-      title: 'Academic Writing: Thesis Statement & 3 Direct Quotes Outline',
-      subject: 'Literature',
-      dueDate: 'Next Monday',
-      completed: false,
-      urgency: 'low'
-    }
-  ]);
+  // Homework Tasks Planner state (persisted per user via Firestore)
+  const [localTasks, setLocalTasks] = useState<UserTask[]>([]);
+  const tasks = propTasks ?? localTasks;
   const [taskFilter, setTaskFilter] = useState<'all' | 'pending' | 'completed'>('all');
   const [showAddTask, setShowAddTask] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -310,6 +357,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // Daily Academic Challenge state
   const [selectedChallengeOption, setSelectedChallengeOption] = useState<string | null>(null);
   const [challengeRevealed, setChallengeRevealed] = useState(false);
+  const [challengeAwarded, setChallengeAwarded] = useState(false);
 
   // Virtual Live Classroom Modal state
   const [classroomOpen, setClassroomOpen] = useState(false);
@@ -360,41 +408,48 @@ export const Dashboard: React.FC<DashboardProps> = ({
     showDashboardToast('Message sent to Daniela in live room!');
   };
 
-  const toggleTask = (id: string) => {
-    setTasks(prev =>
-      prev.map(t => {
-        if (t.id === id) {
-          const next = !t.completed;
-          if (next) {
-            showDashboardToast(`Marked "${t.title.substring(0, 25)}..." as done! ✨`);
-          }
-          return { ...t, completed: next };
-        }
-        return t;
-      })
-    );
+  const toggleTask = async (id: string) => {
+    const target = tasks.find(t => t.id === id);
+    if (!target) return;
+    const next = !target.completed;
+    if (onToggleTask) {
+      await onToggleTask(id, next);
+    } else {
+      setLocalTasks(prev => prev.map(t => (t.id === id ? { ...t, completed: next } : t)));
+    }
+    if (next) {
+      showDashboardToast(`Marked "${target.title.substring(0, 25)}..." as done! +15 XP`);
+    }
   };
 
-  const deleteTask = (id: string) => {
-    setTasks(prev => prev.filter(t => t.id !== id));
-    showDashboardToast('Assignment removed from tracker.');
+  const deleteTask = async (id: string) => {
+    if (onDeleteTask) {
+      await onDeleteTask(id);
+    } else {
+      setLocalTasks(prev => prev.filter(t => t.id !== id));
+    }
+    showDashboardToast('Assignment removed from your tracker.');
   };
 
-  const handleAddTask = (e: React.FormEvent) => {
+  const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
-    const newTask = {
+    const newTask: UserTask = {
       id: `task-${Date.now()}`,
       title: newTaskTitle.trim(),
       subject: newTaskSubject,
-      dueDate: newTaskDueDate || 'This week',
+      dueDate: newTaskDueDate.trim() || 'This week',
       completed: false,
-      urgency: 'medium' as const
+      urgency: 'medium'
     };
-    setTasks(prev => [newTask, ...prev]);
+    if (onAddTask) {
+      await onAddTask(newTask);
+    } else {
+      setLocalTasks(prev => [newTask, ...prev]);
+    }
     setNewTaskTitle('');
     setShowAddTask(false);
-    showDashboardToast(`Added "${newTask.title.substring(0, 25)}..." to your assignments.`);
+    showDashboardToast(`Added "${newTask.title.substring(0, 25)}..." to your personal planner.`);
   };
 
   const handleSolveTaskWithAI = (taskTitle: string, subject: string) => {
@@ -408,10 +463,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
     onBookExpert(tutor);
   };
 
-  const handleSelectChallenge = (option: string) => {
+  const handleSelectChallenge = async (option: string) => {
     setSelectedChallengeOption(option);
     if (option === 'A') {
-      showDashboardToast('🎉 Correct answer! +50 XP added to your weekly streak.');
+      if (!challengeAwarded) {
+        setChallengeAwarded(true);
+        await onAwardActivity?.({ xpDelta: 50, questionsDelta: 1 });
+        showDashboardToast('Correct answer! +50 XP saved to your account.');
+      } else {
+        showDashboardToast('Correct answer! Keep going.');
+      }
     } else {
       showDashboardToast('Not quite! Check the LIATE integration rule below.');
     }
@@ -546,27 +607,33 @@ export const Dashboard: React.FC<DashboardProps> = ({
     );
   };
 
-  const handleCreateNewQuestion = (e: React.FormEvent) => {
+  const handleCreateNewQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newQuestionTitle.trim()) return;
-    const newPost: ForumPost = {
-      id: `post-${Date.now()}`,
-      title: newQuestionTitle.trim(),
-      author: `${user.name} (Student)`,
-      category: newQuestionCategory,
-      repliesCount: 0,
-      votes: 1,
-      userVoted: true,
-      hasExpertAnswer: false,
-      previewText: newQuestionDetails.trim() || 'Question submitted for student peer review and verified tutor answer.',
-      timeAgo: 'Just now',
-      comments: []
-    };
-    setCommunityPosts(prev => [newPost, ...prev]);
+    const title = newQuestionTitle.trim();
+    const details = newQuestionDetails.trim() || 'Question submitted for student peer review and verified tutor answer.';
+    if (onPostQuestion) {
+      await onPostQuestion(title, newQuestionCategory, details);
+    } else {
+      const newPost: ForumPost = {
+        id: `post-${Date.now()}`,
+        title,
+        author: `${user.name} (Student)`,
+        category: newQuestionCategory,
+        repliesCount: 0,
+        votes: 1,
+        userVoted: true,
+        hasExpertAnswer: false,
+        previewText: details,
+        timeAgo: 'Just now',
+        comments: []
+      };
+      setCommunityPosts(prev => [newPost, ...prev]);
+    }
     setNewQuestionTitle('');
     setNewQuestionDetails('');
     setShowNewQuestionForm(false);
-    showDashboardToast('Your question was posted to the Community Board! 🚀');
+    showDashboardToast('Your question was published to the Community Board! +20 XP');
   };
 
   const sendPromptToAi = async (rawPrompt: string) => {
@@ -609,7 +676,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
             base64Data: d.base64Data
           })),
           groundingMode: effectiveMode,
-          userContext: { isSubscribed: true, studentName: profileName }
+          userContext: {
+            isSubscribed: true,
+            studentName: profileName,
+            explanationStyle: user.aiExplanationStyle
+          }
         })
       });
 
@@ -635,6 +706,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           webGroundingSkipped: Boolean(data.webGroundingSkipped)
         }
       ]);
+      onAwardActivity?.({ xpDelta: 15, questionsDelta: 1 });
     } catch (err: any) {
       setAiChatMessages(prev => [
         ...prev,
@@ -683,7 +755,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   };
 
   const navItems: {
-    id: 'home' | 'ai-chat' | 'tutors' | 'sessions' | 'community' | 'google-chat' | 'google-classroom' | 'notes' | 'profile';
+    id: 'home' | 'ai-chat' | 'tutors' | 'sessions' | 'community' | 'google-chat' | 'google-classroom' | 'google-meet' | 'notes' | 'profile';
     label: string;
     icon: React.ComponentType<{ className?: string }>;
     badge?: string;
@@ -696,14 +768,58 @@ export const Dashboard: React.FC<DashboardProps> = ({
     { id: 'community', label: 'Community Q&A', icon: MessageSquare },
     { id: 'google-chat', label: 'Google Chat', icon: MessageSquare, badge: 'Workspace', badgeTone: 'workspace' },
     { id: 'google-classroom', label: 'Google Classroom', icon: GraduationCap, badge: 'Workspace', badgeTone: 'workspace' },
+    { id: 'google-meet', label: 'Google Meet', icon: Video, badge: 'Workspace', badgeTone: 'workspace' },
     { id: 'notes', label: 'Whiteboard Notes', icon: FileText },
     { id: 'profile', label: 'My Profile', icon: User, badge: 'You', badgeTone: 'neutral' }
   ];
 
   const activeTabLabel = navItems.find(item => item.id === activeTab)?.label || 'Overview';
-  const activeSessionsList = propSessions && propSessions.length > 0 ? propSessions : USER_PAST_SESSIONS;
+  const baseSessionsList = propSessions ?? [];
+  const activeSessionsList = baseSessionsList.map(s => {
+    const override = sessionMeetOverrides[s.id];
+    return override ? { ...s, meetUri: override.meetingUri, meetCode: override.meetingCode } : s;
+  });
+  const upcomingSessions = activeSessionsList.filter(s => s.status === 'upcoming');
+  const pastSessions = activeSessionsList.filter(s => s.status !== 'upcoming');
   const activePostsList = communityPosts;
-  const nextSession = activeSessionsList.find(s => s.status === 'upcoming') || activeSessionsList[0];
+  const nextSession = upcomingSessions[0] || null;
+  const userSketches = propSketches ?? [];
+  const totalTutoringMinutes = Math.max(user.tutoringMinutes || 0, pastSessions.length * 60);
+  const formattedTutoringHours =
+    totalTutoringMinutes % 60 === 0
+      ? `${totalTutoringMinutes / 60} h`
+      : `${(totalTutoringMinutes / 60).toFixed(1)} h`;
+  const savedNotesCount = userSketches.length + aiStudyDocs.length;
+
+  const openMeetModal = (session: DashboardSession | null, mode?: 'launch' | 'join') => {
+    setMeetModalSession(session);
+    setMeetModalMode(mode ?? (session?.meetUri ? 'join' : 'launch'));
+    setMeetModalOpen(true);
+  };
+
+  const handleSessionMeetLinked = (
+    sessionId: string,
+    space: { meetingUri: string; meetingCode?: string }
+  ) => {
+    setSessionMeetOverrides(prev => ({ ...prev, [sessionId]: space }));
+    onAttachMeetToSession?.(sessionId, space);
+    setMeetModalSession(prev =>
+      prev && prev.id === sessionId
+        ? { ...prev, meetUri: space.meetingUri, meetCode: space.meetingCode }
+        : prev
+    );
+  };
+
+  const handleCopySessionMeetUri = async (sessionId: string, uri: string) => {
+    try {
+      await navigator.clipboard.writeText(uri);
+      setCopiedSessionId(sessionId);
+      showDashboardToast('Enlace de Google Meet copiado.');
+      setTimeout(() => setCopiedSessionId(null), 2000);
+    } catch {
+      showDashboardToast(`Enlace listo: ${uri}`);
+    }
+  };
 
   const todayFormatted = (() => {
     const raw = new Date().toLocaleDateString('es-ES', {
@@ -740,24 +856,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
     : null;
 
   const recentNotesPreview = [
-    {
-      id: 'note-1',
-      title: 'Derivadas y regla de la cadena',
-      meta: 'Cálculo · Editado hace 2 horas',
-      highlight: false
-    },
-    {
-      id: 'note-2',
-      title: 'Leyes de Newton · ejercicios',
-      meta: 'Física · Editado ayer',
-      highlight: true
-    },
-    {
-      id: 'note-3',
-      title: 'Introducción a Python',
-      meta: 'Programación · Editado el 23 nov.',
-      highlight: false
-    }
+    ...userSketches.slice(0, 3).map((sk, idx) => ({
+      id: sk.id,
+      title: sk.title,
+      meta: `Pizarra personal · ${sk.timestamp}`,
+      highlight: idx === 0,
+      targetSubTab: 'canvas' as const
+    })),
+    ...aiStudyDocs.slice(0, Math.max(0, 3 - userSketches.length)).map(doc => ({
+      id: doc.id,
+      title: doc.name,
+      meta: `Archivo de estudio · ${formatFileSize(doc.sizeBytes)}`,
+      highlight: false,
+      targetSubTab: 'downloads' as const
+    }))
   ];
 
   const renderBadgeStyle = (tone?: 'live' | 'workspace' | 'neutral', isActive?: boolean) => {
@@ -1232,20 +1344,34 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     </button>
                   </div>
                   <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNotificationsOpen(false);
-                        setClassroomOpen(true);
-                      }}
-                      className="w-full text-left p-2.5 rounded-xl bg-[#F2F6FB] hover:bg-slate-100 transition-colors cursor-pointer"
-                    >
-                      <div className="font-semibold text-[#0F2249]">Próxima sesión con {nextSession?.expertName || 'Daniela Ríos'}</div>
-                      <div className="text-[11px] text-slate-500 mt-0.5">{nextSession?.topic || 'Cálculo diferencial'} · {nextSession?.time || 'Mañana, 16:00'}</div>
-                    </button>
+                    {nextSession ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNotificationsOpen(false);
+                          setActiveTab('sessions');
+                        }}
+                        className="w-full text-left p-2.5 rounded-xl bg-[#F2F6FB] hover:bg-slate-100 transition-colors cursor-pointer"
+                      >
+                        <div className="font-semibold text-[#0F2249]">Próxima sesión con {nextSession.expertName}</div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">{nextSession.topic} · {nextSession.time || nextSession.date}</div>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNotificationsOpen(false);
+                          setActiveTab('tutors');
+                        }}
+                        className="w-full text-left p-2.5 rounded-xl bg-[#F2F6FB] hover:bg-slate-100 transition-colors cursor-pointer"
+                      >
+                        <div className="font-semibold text-[#0F2249]">Sin sesiones próximas</div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">Explora tutores verificados para agendar tu primera sesión</div>
+                      </button>
+                    )}
                     <div className="p-2.5 rounded-xl bg-[#FAFAF5] border border-slate-200/70">
                       <div className="font-semibold text-[#0F2249]">{tasks.filter(t => !t.completed).length} tareas pendientes</div>
-                      <div className="text-[11px] text-slate-500 mt-0.5">Plan actual: {user.plan} ({user.daysLeft} días restantes)</div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">Plan actual: {user.plan} ({user.xpPoints} XP)</div>
                     </div>
                   </div>
                 </div>
@@ -1418,59 +1544,140 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
               {/* Right 4 cols: TU PRÓXIMA SESIÓN Card */}
               <div className="lg:col-span-4 bg-white border border-slate-200/90 rounded-2xl p-6 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] tracking-[0.14em] uppercase font-semibold text-slate-500">
-                      Tu próxima sesión
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('sessions')}
-                      className="text-xs font-semibold text-[#0F2249] hover:underline flex items-center gap-1 cursor-pointer"
-                    >
-                      <span>Ver todas</span>
-                      <ArrowUpRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                {nextSession ? (
+                  <>
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] tracking-[0.14em] uppercase font-semibold text-slate-500">
+                          Tu próxima sesión
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('sessions')}
+                          className="text-xs font-semibold text-[#0F2249] hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>Ver todas</span>
+                          <ArrowUpRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
 
-                  <div className="flex items-start gap-3.5 mt-5">
-                    <div className="w-14 h-14 rounded-xl bg-[#F3F5F8] border border-slate-200/70 flex flex-col items-center justify-center shrink-0">
-                      <span className="text-[9px] uppercase tracking-wider font-semibold text-slate-500">
-                        {nextSession?.month?.toUpperCase() || 'NOV'}
-                      </span>
-                      <span className="font-editorial text-xl text-[#0F2249] leading-none mt-0.5">
-                        {nextSession?.day || '26'}
-                      </span>
+                      <div className="flex items-start gap-3.5 mt-5">
+                        <div className="w-14 h-14 rounded-xl bg-[#F3F5F8] border border-slate-200/70 flex flex-col items-center justify-center shrink-0">
+                          <span className="text-[9px] uppercase tracking-wider font-semibold text-slate-500">
+                            {nextSession.month?.toUpperCase() || 'SES'}
+                          </span>
+                          <span className="font-editorial text-xl text-[#0F2249] leading-none mt-0.5">
+                            {nextSession.day || '01'}
+                          </span>
+                        </div>
+
+                        <div className="min-w-0">
+                          <h3 className="font-editorial text-lg text-[#0F2249] leading-snug truncate">
+                            {nextSession.topic}
+                          </h3>
+                          <p className="text-xs text-slate-500 mt-0.5 truncate">
+                            Con {nextSession.expertName} · Tutor verificado
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-xs text-slate-600 mt-5 pt-3 border-t border-slate-100">
+                        <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span>{nextSession.time || nextSession.date}</span>
+                      </div>
+
+                      {nextSession.meetUri && (
+                        <div className="mt-3 px-3 py-2 rounded-xl bg-[#F4F7FB] border border-slate-200/80 flex items-center justify-between gap-2 text-[11px]">
+                          <div className="flex items-center gap-1.5 min-w-0 text-[#0F2249]">
+                            <Link2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            <span className="truncate font-mono">{nextSession.meetUri}</span>
+                          </div>
+                          <a
+                            href={nextSession.meetUri}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-bold text-[#0F2249] hover:underline shrink-0 inline-flex items-center gap-0.5"
+                          >
+                            <span>Entrar</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="min-w-0">
-                      <h3 className="font-editorial text-lg text-[#0F2249] leading-snug truncate">
-                        {nextSession?.topic || 'Cálculo diferencial'}
-                      </h3>
-                      <p className="text-xs text-slate-500 mt-0.5 truncate">
-                        Con {nextSession?.expertName || 'Daniela Ríos'} · Tutora verificada
-                      </p>
+                    <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openMeetModal(nextSession, nextSession.meetUri ? 'join' : 'launch')}
+                        className="py-2.5 px-3 rounded-xl bg-[#0F2249] hover:bg-[#19346b] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                      >
+                        <Video className="w-3.5 h-3.5 text-[#F5C52C]" />
+                        <span>{nextSession.meetUri ? 'Unirse en Meet' : 'Google Meet'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setClassroomOpen(true)}
+                        className="py-2.5 px-3 rounded-xl bg-[#F3F5F8] hover:bg-slate-200/80 text-[#0F2249] text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <span>Preparar aula</span>
+                        <ArrowUpRight className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                  </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] tracking-[0.14em] uppercase font-semibold text-slate-500">
+                          Tu próxima sesión
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('sessions')}
+                          className="text-xs font-semibold text-[#0F2249] hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>Agenda</span>
+                          <ArrowUpRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
 
-                  <div className="flex items-center gap-2 text-xs text-slate-600 mt-5 pt-3 border-t border-slate-100">
-                    <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span>{nextSession?.time || 'Mañana, 16:00 – 17:00'}</span>
-                  </div>
-                </div>
+                      <div className="mt-5 space-y-2">
+                        <div className="w-11 h-11 rounded-xl bg-[#F3F5F8] border border-slate-200/70 flex items-center justify-center text-[#0F2249]">
+                          <Calendar className="w-5 h-5" />
+                        </div>
+                        <h3 className="font-editorial text-lg text-[#0F2249] leading-snug pt-1">
+                          Aún no tienes citas reservadas
+                        </h3>
+                        <p className="text-xs text-slate-500 leading-relaxed">
+                          Aparta tu primera tutoría 1-a-1 con un especialista o abre una sala de Google Meet en segundos.
+                        </p>
+                      </div>
+                    </div>
 
-                <button
-                  type="button"
-                  onClick={() => setClassroomOpen(true)}
-                  className="w-full mt-5 py-2.5 px-4 rounded-xl bg-[#0F2249] hover:bg-[#19346b] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
-                >
-                  <span>Preparar mi sesión</span>
-                  <ArrowUpRight className="w-3.5 h-3.5" />
-                </button>
+                    <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('tutors')}
+                        className="py-2.5 px-3 rounded-xl bg-[#0F2249] hover:bg-[#19346b] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                      >
+                        <Users className="w-3.5 h-3.5 text-[#F5C52C]" />
+                        <span>Explorar tutores</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openMeetModal(null, 'launch')}
+                        className="py-2.5 px-3 rounded-xl bg-[#F3F5F8] hover:bg-slate-200/80 text-[#0F2249] text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Video className="w-3.5 h-3.5" />
+                        <span>Google Meet</span>
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
-            {/* 4-Column KPI Strip */}
+            {/* 4-Column KPI Strip (Live Personal Account Stats) */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <button
                 type="button"
@@ -1481,10 +1688,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <div className="flex items-baseline gap-2.5">
                     <MessageSquare className="w-4 h-4 text-slate-400 self-center shrink-0" />
                     <span className="font-editorial text-2xl sm:text-3xl text-[#0F2249] font-mono-nums">
-                      {12 + aiChatMessages.filter(m => m.sender === 'user').length}
+                      {user.questionsResolved}
                     </span>
                   </div>
-                  <span className="text-[11px] text-slate-400">Esta semana</span>
+                  <span className="text-[11px] text-slate-400">Tu historial</span>
                 </div>
                 <div className="text-xs text-slate-500 mt-3 font-medium">Preguntas resueltas</div>
               </button>
@@ -1498,10 +1705,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <div className="flex items-baseline gap-2.5">
                     <Clock className="w-4 h-4 text-slate-400 self-center shrink-0" />
                     <span className="font-editorial text-2xl sm:text-3xl text-[#0F2249] font-mono-nums">
-                      4 h
+                      {formattedTutoringHours}
                     </span>
                   </div>
-                  <span className="text-[11px] text-slate-400">Este mes</span>
+                  <span className="text-[11px] text-slate-400">{activeSessionsList.length} sesiones</span>
                 </div>
                 <div className="text-xs text-slate-500 mt-3 font-medium">Aprendiendo con tutores</div>
               </button>
@@ -1515,7 +1722,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <div className="flex items-baseline gap-2.5">
                     <FileText className="w-4 h-4 text-slate-400 self-center shrink-0" />
                     <span className="font-editorial text-2xl sm:text-3xl text-[#0F2249] font-mono-nums">
-                      {String(8 + aiStudyDocs.length).padStart(2, '0')}
+                      {String(savedNotesCount).padStart(2, '0')}
                     </span>
                   </div>
                   <span className="text-[11px] text-slate-400">Tu biblioteca</span>
@@ -1523,18 +1730,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div className="text-xs text-slate-500 mt-3 font-medium">Apuntes guardados</div>
               </button>
 
-              <div className="bg-white border border-slate-200/90 rounded-2xl p-5 text-left">
+              <button
+                type="button"
+                onClick={() => onOpenProfile?.()}
+                className="bg-white border border-slate-200/90 hover:border-[#0F2249]/30 rounded-2xl p-5 text-left transition-all cursor-pointer"
+              >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-baseline gap-2.5">
                     <BarChart2 className="w-4 h-4 text-slate-400 self-center shrink-0" />
                     <span className="font-editorial text-2xl sm:text-3xl text-[#0F2249] font-mono-nums">
-                      {user.streakDays || 3} días
+                      {user.streakDays} {user.streakDays === 1 ? 'día' : 'días'}
                     </span>
                   </div>
-                  <span className="text-[11px] text-slate-400">¡Sigue así!</span>
+                  <span className="text-[11px] text-slate-400">{user.xpPoints} XP</span>
                 </div>
                 <div className="text-xs text-slate-500 mt-3 font-medium">Tu racha de aprendizaje</div>
-              </div>
+              </button>
             </div>
 
             {/* Middle 2-Column Row: Retoma donde lo dejaste + Avanza en compañía */}
@@ -1545,7 +1756,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h3 className="font-editorial text-xl text-[#0F2249]">Retoma donde lo dejaste.</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">Tus apuntes, siempre a mano.</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Tus apuntes personales, siempre a mano.</p>
                   </div>
                   <button
                     type="button"
@@ -1557,38 +1768,56 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </button>
                 </div>
 
-                <div className="divide-y divide-slate-100">
-                  {recentNotesPreview.map(note => (
+                {recentNotesPreview.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-200 bg-[#FAFAF5] p-5 text-center space-y-3">
+                    <p className="text-xs text-slate-500">
+                      Todavía no has guardado notas de pizarra ni archivos de estudio en tu cuenta.
+                    </p>
                     <button
                       type="button"
-                      key={note.id}
                       onClick={() => {
-                        setNotesSubTab('downloads');
+                        setNotesSubTab('canvas');
                         setActiveTab('notes');
                       }}
-                      className="w-full py-3.5 first:pt-1 last:pb-1 flex items-center justify-between gap-3 hover:bg-slate-50/80 px-2 -mx-2 rounded-xl transition-colors text-left cursor-pointer group"
+                      className="px-4 py-2 rounded-lg bg-[#0F2249] text-white text-xs font-semibold cursor-pointer hover:bg-[#19346b] transition-colors"
                     >
-                      <div className="flex items-center gap-3.5 min-w-0">
-                        <div
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
-                            note.highlight
-                              ? 'bg-amber-50 border-amber-200/80 text-amber-700'
-                              : 'bg-[#F3F5F8] border-slate-200/70 text-[#0F2249]'
-                          }`}
-                        >
-                          <FileText className="w-4 h-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs sm:text-sm font-semibold text-[#0F2249] truncate">
-                            {note.title}
-                          </div>
-                          <div className="text-[11px] text-slate-400 mt-0.5 truncate">{note.meta}</div>
-                        </div>
-                      </div>
-                      <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-[#0F2249] shrink-0 transition-colors" />
+                      Abrir pizarra personal
                     </button>
-                  ))}
-                </div>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {recentNotesPreview.map(note => (
+                      <button
+                        type="button"
+                        key={note.id}
+                        onClick={() => {
+                          setNotesSubTab(note.targetSubTab);
+                          setActiveTab('notes');
+                        }}
+                        className="w-full py-3.5 first:pt-1 last:pb-1 flex items-center justify-between gap-3 hover:bg-slate-50/80 px-2 -mx-2 rounded-xl transition-colors text-left cursor-pointer group"
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
+                              note.highlight
+                                ? 'bg-amber-50 border-amber-200/80 text-amber-700'
+                                : 'bg-[#F3F5F8] border-slate-200/70 text-[#0F2249]'
+                            }`}
+                          >
+                            <FileText className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs sm:text-sm font-semibold text-[#0F2249] truncate">
+                              {note.title}
+                            </div>
+                            <div className="text-[11px] text-slate-400 mt-0.5 truncate">{note.meta}</div>
+                          </div>
+                        </div>
+                        <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-[#0F2249] shrink-0 transition-colors" />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Right Card: Community Preview */}
@@ -1714,7 +1943,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             {/* Google Workspace & Interactive Tools Strip */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <button
                 type="button"
                 onClick={() => setActiveTab('google-chat')}
@@ -1744,6 +1973,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <div>
                     <div className="text-xs font-bold text-[#0F2249]">Google Classroom</div>
                     <div className="text-[11px] text-slate-500">Cursos, entregas y anuncios</div>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-slate-400 shrink-0" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('google-meet')}
+                className="bg-white border border-slate-200/90 hover:border-[#0F2249]/35 rounded-2xl p-4 flex items-center justify-between gap-3 text-left transition-all cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200/70 text-emerald-700 flex items-center justify-center shrink-0">
+                    <Video className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-[#0F2249]">Google Meet</div>
+                    <div className="text-[11px] text-slate-500">Salas en vivo e historial</div>
                   </div>
                 </div>
                 <ArrowUpRight className="w-4 h-4 text-slate-400 shrink-0" />
@@ -1883,90 +2129,99 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                   {/* Task Rows */}
                   <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
-                    {tasks
-                      .filter(t => {
-                        if (taskFilter === 'pending') return !t.completed;
-                        if (taskFilter === 'completed') return t.completed;
-                        return true;
-                      })
-                      .map(task => (
-                        <div
-                          key={task.id}
-                          className={`p-3.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                            task.completed
-                              ? 'bg-[#080f21]/60 border-slate-800/80 opacity-70'
-                              : 'bg-[#080f21] border-slate-800 hover:border-slate-700'
-                          }`}
-                        >
-                          <div className="flex items-start gap-3 flex-1 min-w-0">
-                            <button
-                              type="button"
-                              onClick={() => toggleTask(task.id)}
-                              className="mt-0.5 text-slate-400 hover:text-[#F6C62B] transition-colors cursor-pointer shrink-0"
-                            >
-                              {task.completed ? (
-                                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                              ) : (
-                                <Square className="w-5 h-5 text-slate-500 hover:text-white" />
-                              )}
-                            </button>
-                            <div className="min-w-0">
-                              <p
-                                className={`text-xs sm:text-sm font-semibold truncate ${
-                                  task.completed ? 'line-through text-slate-400' : 'text-white'
-                                }`}
+                    {tasks.length === 0 ? (
+                      <div className="p-6 rounded-xl bg-[#080f21] border border-dashed border-slate-800 text-center space-y-2">
+                        <p className="text-xs font-semibold text-white">No assignments tracked yet</p>
+                        <p className="text-[11px] text-slate-400">
+                          Click "Add Task" above to save homework deadlines directly to your account.
+                        </p>
+                      </div>
+                    ) : (
+                      tasks
+                        .filter(t => {
+                          if (taskFilter === 'pending') return !t.completed;
+                          if (taskFilter === 'completed') return t.completed;
+                          return true;
+                        })
+                        .map(task => (
+                          <div
+                            key={task.id}
+                            className={`p-3.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                              task.completed
+                                ? 'bg-[#080f21]/60 border-slate-800/80 opacity-70'
+                                : 'bg-[#080f21] border-slate-800 hover:border-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-start gap-3 flex-1 min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => toggleTask(task.id)}
+                                className="mt-0.5 text-slate-400 hover:text-[#F6C62B] transition-colors cursor-pointer shrink-0"
                               >
-                                {task.title}
-                              </p>
-                              <div className="flex flex-wrap items-center gap-2 mt-1">
-                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#0F2249] text-amber-300 border border-amber-500/20">
-                                  {task.subject}
-                                </span>
-                                <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                                  <Clock className="w-3 h-3 text-slate-500" />
-                                  <span>{task.dueDate}</span>
-                                </span>
+                                {task.completed ? (
+                                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                                ) : (
+                                  <Square className="w-5 h-5 text-slate-500 hover:text-white" />
+                                )}
+                              </button>
+                              <div className="min-w-0">
+                                <p
+                                  className={`text-xs sm:text-sm font-semibold truncate ${
+                                    task.completed ? 'line-through text-slate-400' : 'text-white'
+                                  }`}
+                                >
+                                  {task.title}
+                                </p>
+                                <div className="flex flex-wrap items-center gap-2 mt-1">
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#0F2249] text-amber-300 border border-amber-500/20">
+                                    {task.subject}
+                                  </span>
+                                  <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                                    <Clock className="w-3 h-3 text-slate-500" />
+                                    <span>{task.dueDate}</span>
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
-                            <button
-                              type="button"
-                              onClick={() => handleSolveTaskWithAI(task.title, task.subject)}
-                              className="px-2.5 py-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 text-[11px] font-bold transition-colors flex items-center gap-1 cursor-pointer"
-                              title="Solve problem step-by-step with 24/7 AI"
-                            >
-                              <Bot className="w-3 h-3" />
-                              <span>Solve with AI</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleBookTutorForSubject(task.subject)}
-                              className="px-2.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-[#F6C62B] border border-amber-500/30 text-[11px] font-bold transition-colors flex items-center gap-1 cursor-pointer"
-                              title="Book a verified human tutor for this subject"
-                            >
-                              <Users className="w-3 h-3" />
-                              <span>Book Tutor</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => deleteTask(task.id)}
-                              className="p-1.5 text-slate-500 hover:text-rose-400 transition-colors cursor-pointer rounded-lg hover:bg-slate-800"
-                              title="Delete task"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
+                              <button
+                                type="button"
+                                onClick={() => handleSolveTaskWithAI(task.title, task.subject)}
+                                className="px-2.5 py-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 text-[11px] font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                                title="Solve problem step-by-step with 24/7 AI"
+                              >
+                                <Bot className="w-3 h-3" />
+                                <span>Solve with AI</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleBookTutorForSubject(task.subject)}
+                                className="px-2.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-[#F6C62B] border border-amber-500/30 text-[11px] font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                                title="Book a verified human tutor for this subject"
+                              >
+                                <Users className="w-3 h-3" />
+                                <span>Book Tutor</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => deleteTask(task.id)}
+                                className="p-1.5 text-slate-500 hover:text-rose-400 transition-colors cursor-pointer rounded-lg hover:bg-slate-800"
+                                title="Delete task"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))
+                    )}
                   </div>
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
                   <span>{tasks.filter(t => t.completed).length} of {tasks.length} assignments completed</span>
                   <span className="text-emerald-400 font-semibold font-mono-nums">
-                    {Math.round((tasks.filter(t => t.completed).length / Math.max(tasks.length, 1)) * 100)}% Complete
+                    {tasks.length === 0 ? 0 : Math.round((tasks.filter(t => t.completed).length / tasks.length) * 100)}% Complete
                   </span>
                 </div>
               </div>
@@ -2064,10 +2319,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       <FileText className="w-4 h-4 text-[#F6C62B]" />
                       <h4 className="font-bold text-white text-sm font-display">Latest Tutor Feedback</h4>
                     </div>
-                    <span className="text-[11px] text-slate-400">Daniela Ríos</span>
+                    <span className="text-[11px] text-slate-400">
+                      {pastSessions[0]?.expertName || activeSessionsList[0]?.expertName || 'Your Tutors'}
+                    </span>
                   </div>
                   <p className="text-xs text-slate-200 italic leading-relaxed bg-[#080f21] p-3.5 rounded-xl border border-slate-800">
-                    "Redo problems 4 to 9 without the formula sheet, then send me the two that felt slow. Remember LIATE rule for picking u!"
+                    {pastSessions[0]?.tutorNotes ||
+                      activeSessionsList[0]?.tutorNotes ||
+                      'Tutor notes and personalized study recommendations will appear here after you book or complete a session.'}
                   </p>
                 </div>
 
@@ -2361,40 +2620,272 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         {/* Tab 4: My Sessions */}
         {activeTab === 'sessions' && (
-          <div className="p-6 lg:p-8 space-y-6 max-w-4xl mx-auto w-full">
-            <div>
-              <h2 className="text-2xl font-bold text-white font-display">My Tutoring Sessions</h2>
-              <p className="text-xs text-slate-300 mt-1">All past and scheduled 1-on-1 calls with tutor notes.</p>
+          <div className="p-6 lg:p-8 space-y-8 max-w-5xl mx-auto w-full">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="font-editorial text-2xl sm:text-3xl text-[#0F2249]">
+                  My Tutoring Sessions
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                  Únete directo con Google Meet desde tus sesiones reservadas o consulta tus notas anteriores.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => openMeetModal(null, 'join')}
+                  className="px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:border-[#0F2249]/40 text-[#0F2249] text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <Link2 className="w-3.5 h-3.5" />
+                  <span>Unirse con enlace</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openMeetModal(null, 'launch')}
+                  className="px-4 py-2.5 rounded-xl bg-[#0F2249] hover:bg-[#19346b] text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs"
+                >
+                  <Video className="w-3.5 h-3.5 text-[#F5C52C]" />
+                  <span>Lanzar sala Google Meet</span>
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-4">
-              {(propSessions && propSessions.length > 0 ? propSessions : USER_PAST_SESSIONS).map(s => (
-                <div key={s.id} className="bg-[#0c162e] border border-slate-700 rounded-2xl p-5 space-y-3">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-[#0F2249] text-white flex flex-col items-center justify-center font-mono-nums">
-                        <span className="text-xs font-bold">{s.day}</span>
-                        <span className="text-[9px] uppercase text-[#F6C62B]">{s.month}</span>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-white">{s.topic}</h4>
-                        <p className="text-xs text-slate-400">with {s.expertName} · {s.subject}</p>
-                      </div>
-                    </div>
+            {/* Upcoming Booked Sessions */}
+            <div className="space-y-3.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] uppercase tracking-[0.14em] font-bold text-slate-500">
+                    Próximas sesiones reservadas ({upcomingSessions.length})
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('tutors')}
+                  className="text-xs font-semibold text-[#0F2249] hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <span>Reservar nueva tutoría</span>
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {upcomingSessions.length === 0 ? (
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-6 text-center space-y-3">
+                  <Calendar className="w-7 h-7 text-slate-400 mx-auto" />
+                  <div className="space-y-1">
+                    <p className="font-editorial text-lg text-[#0F2249]">
+                      No tienes sesiones próximas reservadas
+                    </p>
+                    <p className="text-xs text-slate-500 max-w-md mx-auto">
+                      Reserva una tutoría 1-a-1 con un especialista o abre una sala instantánea de Google Meet.
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-center gap-2.5 pt-1">
                     <button
-                      onClick={() => onBookExpert(EXPERTS_DATA[0])}
-                      className="px-3 py-1.5 text-xs font-bold text-slate-950 bg-[#F6C62B] hover:bg-[#ffd744] rounded-lg transition-colors cursor-pointer"
+                      type="button"
+                      onClick={() => setActiveTab('tutors')}
+                      className="px-4 py-2 rounded-xl bg-[#F5C52C] hover:bg-[#e5b51f] text-[#0F2249] text-xs font-bold cursor-pointer"
                     >
-                      Rebook
+                      Explorar tutores
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openMeetModal(null, 'launch')}
+                      className="px-4 py-2 rounded-xl bg-[#0F2249] hover:bg-[#19346b] text-white text-xs font-semibold cursor-pointer"
+                    >
+                      Crear sala Meet
                     </button>
                   </div>
-
-                  <div className="bg-[#080f21] p-3.5 rounded-xl border border-slate-800 text-xs text-slate-300">
-                    <div className="font-semibold text-[#F6C62B] mb-1">Tutor Feedback & Homework Checklist:</div>
-                    <p className="italic">{s.tutorNotes}</p>
-                  </div>
                 </div>
-              ))}
+              ) : (
+                <div className="space-y-3.5">
+                  {upcomingSessions.map(s => (
+                    <div
+                      key={s.id}
+                      className="bg-white border border-slate-200/90 rounded-2xl p-5 space-y-4 shadow-2xs"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex items-start gap-3.5 min-w-0">
+                          <div className="w-12 h-12 rounded-xl bg-[#0F2249] text-white flex flex-col items-center justify-center font-mono-nums shrink-0">
+                            <span className="text-sm font-bold leading-none">{s.day}</span>
+                            <span className="text-[9px] uppercase text-[#F5C52C] mt-0.5">{s.month}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/70 text-[10px] font-bold uppercase tracking-wider">
+                                Próxima
+                              </span>
+                              {s.urgentUsed && (
+                                <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold">
+                                  Prioridad urgente
+                                </span>
+                              )}
+                              {s.time && (
+                                <span className="text-[11px] text-slate-500 inline-flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {s.time}
+                                </span>
+                              )}
+                            </div>
+                            <h4 className="font-editorial text-lg text-[#0F2249] mt-1 truncate">
+                              {s.topic}
+                            </h4>
+                            <p className="text-xs text-slate-500">
+                              Con {s.expertName} · {s.subject}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => openMeetModal(s, s.meetUri ? 'join' : 'launch')}
+                            className="px-4 py-2.5 rounded-xl bg-[#0F2249] hover:bg-[#19346b] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                          >
+                            <Video className="w-3.5 h-3.5 text-[#F5C52C]" />
+                            <span>{s.meetUri ? 'Unirse por Meet' : 'Lanzar Google Meet'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => openMeetModal(s, 'join')}
+                            className="px-3.5 py-2.5 rounded-xl bg-[#F3F5F8] hover:bg-slate-200/80 text-[#0F2249] text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                          >
+                            <Link2 className="w-3.5 h-3.5" />
+                            <span>{s.meetUri ? 'Cambiar enlace' : 'Unirse con enlace'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setClassroomOpen(true)}
+                            className="px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 hover:border-slate-300 text-slate-700 text-xs font-semibold cursor-pointer transition-colors"
+                          >
+                            Pizarra
+                          </button>
+
+                          {onCompleteSession && (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                await onCompleteSession(s.id);
+                                showDashboardToast('Sesión marcada como completada (+60 min, +80 XP).');
+                              }}
+                              className="px-3.5 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-xs font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Completada</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Embedded Google Meet Link Strip (when linked to this booked session) */}
+                      {s.meetUri && (
+                        <div className="p-3.5 rounded-xl bg-[#F4F7FB] border border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Link2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <div className="min-w-0">
+                              <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 block">
+                                Enlace integrado de Google Meet{s.meetCode ? ` · ${s.meetCode}` : ''}
+                              </span>
+                              <a
+                                href={s.meetUri}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-mono text-[#0F2249] hover:underline truncate block"
+                              >
+                                {s.meetUri}
+                              </a>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleCopySessionMeetUri(s.id, s.meetUri!)}
+                              className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-[#0F2249] font-semibold inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              {copiedSessionId === s.id ? (
+                                <>
+                                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span>Copiado</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3.5 h-3.5" />
+                                  <span>Copiar</span>
+                                </>
+                              )}
+                            </button>
+                            <a
+                              href={s.meetUri}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3.5 py-1.5 rounded-lg bg-[#F5C52C] hover:bg-[#e5b51f] text-[#0F2249] font-bold inline-flex items-center gap-1"
+                            >
+                              <span>Entrar directo</span>
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="bg-[#FAFAF5] p-3.5 rounded-xl border border-slate-200/80 text-xs text-slate-600">
+                        <span className="font-bold text-[#0F2249]">Notas de preparación: </span>
+                        <span>{s.tutorNotes}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Completed Past Sessions */}
+            <div className="space-y-3.5">
+              <div className="text-[11px] uppercase tracking-[0.14em] font-bold text-slate-500">
+                Sesiones completadas ({pastSessions.length})
+              </div>
+              {pastSessions.length === 0 ? (
+                <div className="bg-white border border-dashed border-slate-200 rounded-2xl p-6 text-center text-xs text-slate-500">
+                  Aún no tienes sesiones completadas en tu historial. Cuando finalices una tutoría aparecerán aquí junto con tus notas.
+                </div>
+              ) : (
+                <div className="space-y-3.5">
+                  {pastSessions.map(s => (
+                    <div
+                      key={s.id}
+                      className="bg-white border border-slate-200/90 rounded-2xl p-5 space-y-3"
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-[#F3F5F8] border border-slate-200/80 text-[#0F2249] flex flex-col items-center justify-center font-mono-nums">
+                            <span className="text-xs font-bold">{s.day}</span>
+                            <span className="text-[9px] uppercase text-slate-500">{s.month}</span>
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-bold text-[#0F2249]">{s.topic}</h4>
+                            <p className="text-xs text-slate-500">with {s.expertName} · {s.subject}</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => onBookExpert(EXPERTS_DATA.find(e => e.name === s.expertName) || EXPERTS_DATA[0])}
+                          className="px-3.5 py-1.5 text-xs font-bold text-[#0F2249] bg-[#F5C52C] hover:bg-[#e5b51f] rounded-lg transition-colors cursor-pointer"
+                        >
+                          Rebook
+                        </button>
+                      </div>
+
+                      <div className="bg-[#FAFAF5] p-3.5 rounded-xl border border-slate-200/80 text-xs text-slate-600">
+                        <div className="font-semibold text-[#0F2249] mb-1">
+                          Tutor Feedback &amp; Homework Checklist:
+                        </div>
+                        <p className="italic">{s.tutorNotes}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -2792,7 +3283,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             {notesSubTab === 'canvas' ? (
-              <WhiteboardCanvas />
+              <WhiteboardCanvas
+                sketches={userSketches}
+                onSaveSketch={onSaveSketch}
+                onDeleteSketch={onDeleteSketch}
+              />
             ) : (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2881,6 +3376,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* Tab 8: Google Classroom Workspace Integration */}
         {activeTab === 'google-classroom' && (
           <GoogleClassroomPanel onNotify={showDashboardToast} />
+        )}
+
+        {/* Tab 9: Google Meet Workspace Integration */}
+        {activeTab === 'google-meet' && (
+          <GoogleMeetPanel onNotify={showDashboardToast} />
         )}
 
       </main>
@@ -3135,109 +3635,203 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       )}
 
-      {/* Plans Discovery Modal */}
-      {plansModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl">
-            <div className="px-6 py-4 bg-[#FAFAF5] border-b border-slate-200 flex items-center justify-between">
-              <div>
-                <div className="text-[10px] tracking-[0.14em] uppercase font-semibold text-slate-500">
-                  Planes ProLnk
-                </div>
-                <h3 className="font-editorial text-xl text-[#0F2249]">Un plan para cada ritmo.</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPlansModalOpen(false)}
-                className="p-1.5 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-              {[
-                { name: 'Starter', price: 'Q120', desc: '1 hora de tutoría + 50 preguntas de IA al mes', accent: false },
-                { name: 'Plus', price: 'Q240', desc: '3 horas de tutoría + IA ilimitada + notas de pizarra', accent: true },
-                { name: 'Unlimited STEM', price: 'Q450', desc: '6 horas de tutoría + IA ilimitada + matching prioritario', accent: false }
-              ].map(p => (
-                <div
-                  key={p.name}
-                  className={`rounded-2xl p-4 border flex flex-col justify-between space-y-4 ${
-                    p.accent ? 'bg-[#0F2249] text-white border-[#0F2249]' : 'bg-[#FAFAF5] text-[#0F2249] border-slate-200'
-                  }`}
-                >
+      {/* Plans Discovery Modal (Editorial Split Design) */}
+      {plansModalOpen && (() => {
+        const planCopy = DASHBOARD_PLANS_PHRASES[plansPhraseIdx];
+        return (
+          <div
+            onClick={e => {
+              if (e.target === e.currentTarget) setPlansModalOpen(false);
+            }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150"
+          >
+            <div className="bg-white border border-slate-200 rounded-[24px] w-full max-w-4xl overflow-hidden shadow-2xl grid grid-cols-1 md:grid-cols-[34%_66%]">
+              <div className="editorial-grid-panel p-6 sm:p-7 flex flex-col justify-between gap-6 border-b md:border-b-0 md:border-r border-slate-200/80">
+                <div className="space-y-4">
+                  <div className="inline-block bg-[#F5C52C] text-[#0F2249] text-[10px] font-extrabold uppercase tracking-[0.12em] px-3 py-1.5 rounded-md">
+                    {planCopy.badge}
+                  </div>
                   <div>
-                    <div className="font-editorial text-lg">{p.name}</div>
-                    <div className="font-editorial text-2xl mt-2">{p.price}<span className="text-[11px] font-sans opacity-75"> /mes</span></div>
-                    <p className={`text-[11px] mt-2 leading-relaxed ${p.accent ? 'text-slate-300' : 'text-slate-600'}`}>{p.desc}</p>
+                    <h3 className="font-editorial text-2xl leading-[1.08] text-[#0F2249]">
+                      {planCopy.line1}
+                      <br />
+                      {planCopy.line2}
+                    </h3>
+                    <div className="mt-1 inline-block">
+                      <span className="font-serif-accent text-2xl text-[#0F2249] block">
+                        {planCopy.accent}
+                      </span>
+                      <div className="h-[4px] w-full bg-[#F5C52C] rounded-full mt-1" />
+                    </div>
+                  </div>
+                  <p className="text-xs leading-relaxed text-slate-600">{planCopy.desc}</p>
+                </div>
+                <div className="text-[10px] tracking-[0.16em] uppercase font-medium text-slate-500">
+                  IA 24/7  /  TUTORÍAS  /  CAMBIA CUANDO QUIERAS
+                </div>
+              </div>
+
+              <div className="bg-white p-6 sm:p-7 relative space-y-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-[10px] tracking-[0.15em] uppercase font-semibold text-slate-500">
+                      Tu membresía
+                    </div>
+                    <h4 className="font-editorial text-xl text-[#0F2249]">Elige el plan ideal</h4>
                   </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      setPlansModalOpen(false);
-                      if (onUpdateProfile) {
-                        onUpdateProfile({ plan: `${p.name} (${p.price}/mes)` });
-                      }
-                      showDashboardToast(`Plan ${p.name} seleccionado en tu portal.`);
-                    }}
-                    className={`w-full py-2 rounded-lg font-bold text-xs cursor-pointer transition-colors ${
-                      p.accent ? 'bg-[#F5C52C] hover:bg-[#eab921] text-[#0F2249]' : 'bg-[#0F2249] hover:bg-[#19346b] text-white'
-                    }`}
+                    onClick={() => setPlansModalOpen(false)}
+                    aria-label="Cerrar planes"
+                    className="p-1.5 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100 cursor-pointer"
                   >
-                    Elegir {p.name}
+                    <X className="w-5 h-5" />
                   </button>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Help & Support Modal */}
-      {helpModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <HelpCircle className="w-5 h-5 text-[#0F2249]" />
-                <h3 className="font-editorial text-lg text-[#0F2249]">Ayuda y soporte</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 text-xs">
+                  {[
+                    { name: 'Starter', price: 'Q120', desc: '1 hora de tutoría + 50 preguntas de IA al mes', accent: false },
+                    { name: 'Plus', price: 'Q240', desc: '3 horas de tutoría + IA ilimitada + notas de pizarra', accent: true },
+                    { name: 'Unlimited STEM', price: 'Q450', desc: '6 horas de tutoría + IA ilimitada + matching prioritario', accent: false }
+                  ].map(p => (
+                    <div
+                      key={p.name}
+                      className={`rounded-2xl p-4 border flex flex-col justify-between space-y-4 ${
+                        p.accent ? 'bg-[#0F2249] text-white border-[#0F2249]' : 'bg-[#FAFAF5] text-[#0F2249] border-slate-200'
+                      }`}
+                    >
+                      <div>
+                        <div className="font-editorial text-lg">{p.name}</div>
+                        <div className="font-editorial text-2xl mt-2">
+                          {p.price}
+                          <span className="text-[11px] font-sans opacity-75"> /mes</span>
+                        </div>
+                        <p className={`text-[11px] mt-2 leading-relaxed ${p.accent ? 'text-slate-300' : 'text-slate-600'}`}>
+                          {p.desc}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPlansModalOpen(false);
+                          if (onUpdateProfile) {
+                            onUpdateProfile({ plan: `${p.name} (${p.price}/mes)` });
+                          }
+                          showDashboardToast(`Plan ${p.name} seleccionado en tu portal.`);
+                        }}
+                        className={`w-full py-2.5 rounded-xl font-bold text-xs cursor-pointer transition-colors ${
+                          p.accent ? 'bg-[#F5C52C] hover:bg-[#eab921] text-[#0F2249]' : 'bg-[#0F2249] hover:bg-[#19346b] text-white'
+                        }`}
+                      >
+                        Elegir {p.name}
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setHelpModalOpen(false)}
-                className="p-1.5 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              ¿Necesitas ayuda con tus sesiones, Classroom o apuntes? Puedes consultar a ProLnk AI las 24 horas o abrir una tutoría urgente con un especialista verificado.
-            </p>
-            <div className="flex items-center gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setHelpModalOpen(false);
-                  setActiveTab('ai-chat');
-                }}
-                className="flex-1 py-2.5 rounded-lg bg-[#F5C52C] hover:bg-[#eab921] text-[#0F2249] font-bold text-xs cursor-pointer"
-              >
-                Ir a AI Tutor 24/7
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setHelpModalOpen(false);
-                  setActiveTab('tutors');
-                }}
-                className="flex-1 py-2.5 rounded-lg bg-[#0F2249] hover:bg-[#19346b] text-white font-bold text-xs cursor-pointer"
-              >
-                Buscar tutor
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
+
+      {/* Help & Support Modal (Editorial Split Design) */}
+      {helpModalOpen && (() => {
+        const helpCopy = DASHBOARD_HELP_PHRASES[helpPhraseIdx];
+        return (
+          <div
+            onClick={e => {
+              if (e.target === e.currentTarget) setHelpModalOpen(false);
+            }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150"
+          >
+            <div className="bg-white border border-slate-200 rounded-[24px] w-full max-w-[780px] overflow-hidden shadow-2xl grid grid-cols-1 md:grid-cols-[44%_56%]">
+              <div className="editorial-grid-panel p-6 sm:p-7 flex flex-col justify-between gap-6 border-b md:border-b-0 md:border-r border-slate-200/80">
+                <div className="space-y-4">
+                  <div className="inline-block bg-[#F5C52C] text-[#0F2249] text-[10px] font-extrabold uppercase tracking-[0.12em] px-3 py-1.5 rounded-md">
+                    {helpCopy.badge}
+                  </div>
+                  <div>
+                    <h3 className="font-editorial text-2xl leading-[1.08] text-[#0F2249]">
+                      {helpCopy.line1}
+                      <br />
+                      {helpCopy.line2}
+                    </h3>
+                    <div className="mt-1 inline-block">
+                      <span className="font-serif-accent text-2xl text-[#0F2249] block">
+                        {helpCopy.accent}
+                      </span>
+                      <div className="h-[4px] w-full bg-[#F5C52C] rounded-full mt-1" />
+                    </div>
+                  </div>
+                </div>
+                <div className="text-[10px] tracking-[0.16em] uppercase font-medium text-slate-500">
+                  IA 24/7  /  CLASSROOM  /  TUTORÍAS
+                </div>
+              </div>
+
+              <div className="bg-white p-6 sm:p-7 relative flex flex-col justify-center space-y-5">
+                <button
+                  type="button"
+                  onClick={() => setHelpModalOpen(false)}
+                  aria-label="Cerrar ayuda"
+                  className="absolute top-4 right-4 p-1.5 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+
+                <div>
+                  <div className="text-[10px] tracking-[0.15em] uppercase font-semibold text-slate-500">
+                    Centro de ayuda
+                  </div>
+                  <h3 className="font-editorial text-2xl text-[#0F2249] mt-0.5 flex items-center gap-2">
+                    <HelpCircle className="w-5 h-5 text-[#0F2249]" />
+                    <span>¿En qué te apoyamos?</span>
+                  </h3>
+                </div>
+
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  ¿Necesitas ayuda con tus sesiones, Google Classroom o apuntes? Puedes consultar a ProLnk AI las 24 horas o apartar una tutoría con un especialista verificado.
+                </p>
+
+                <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHelpModalOpen(false);
+                      setActiveTab('ai-chat');
+                    }}
+                    className="w-full sm:w-1/2 py-3 rounded-xl bg-[#F5C52C] hover:bg-[#eab921] text-[#0F2249] font-bold text-xs cursor-pointer transition-colors"
+                  >
+                    Ir a AI Tutor 24/7
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHelpModalOpen(false);
+                      setActiveTab('tutors');
+                    }}
+                    className="w-full sm:w-1/2 py-3 rounded-xl bg-[#0F2249] hover:bg-[#19346b] text-white font-bold text-xs cursor-pointer transition-colors inline-flex items-center justify-center gap-1"
+                  >
+                    <span>Buscar tutor</span>
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Google Meet Launch / Join Modal */}
+      <GoogleMeetModal
+        isOpen={meetModalOpen}
+        onClose={() => setMeetModalOpen(false)}
+        session={meetModalSession}
+        initialMode={meetModalMode}
+        onSpaceLinked={handleSessionMeetLinked}
+        onNotify={showDashboardToast}
+      />
 
       {/* Dashboard Toast */}
       {dashboardToast && (

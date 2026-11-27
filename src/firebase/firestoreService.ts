@@ -2,6 +2,7 @@ import {
   doc,
   setDoc,
   getDoc,
+  deleteDoc,
   collection,
   getDocs,
   query,
@@ -13,8 +14,8 @@ import {
   Timestamp
 } from 'firebase/firestore';
 import { db, auth } from './config';
-import { ForumPost, DashboardSession } from '../types';
-import { FORUM_POSTS, USER_PAST_SESSIONS } from '../data/mockData';
+import { ForumPost, DashboardSession, UserTask, SavedSketch } from '../types';
+import { FORUM_POSTS } from '../data/mockData';
 
 export enum OperationType {
   CREATE = 'create',
@@ -84,15 +85,32 @@ export interface UserProfileData {
   learningGoal?: string;
   streakDays?: number;
   xpPoints?: number;
+  questionsResolved?: number;
+  tutoringMinutes?: number;
+  notesSavedCount?: number;
+  forumPostsCount?: number;
+  lastActiveDate?: string;
+  aiExplanationStyle?: 'detailed' | 'quick';
+  emailNotifications?: boolean;
+  sessionReminders?: boolean;
 }
 
-export interface SavedSketchRecord {
-  id: string;
+export interface SavedSketchRecord extends SavedSketch {
   userId: string;
-  title: string;
-  dataUrl: string;
-  timestamp: string;
   createdAt: string;
+}
+
+export function getLocalDateKey(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function getYesterdayDateKey(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return getLocalDateKey(d);
 }
 
 function clampString(val: string | undefined, maxLen: number): string | undefined {
@@ -154,13 +172,31 @@ export const saveUserProfile = async (profile: UserProfileData): Promise<void> =
     semester: clampString(profile.semester, 60),
     targetSubjects: boundedSubjects,
     learningGoal: clampString(profile.learningGoal, 500),
-    streakDays: typeof profile.streakDays === 'number' ? Math.max(0, Math.min(100000, profile.streakDays)) : undefined,
-    xpPoints: typeof profile.xpPoints === 'number' ? Math.max(0, Math.min(10000000, profile.xpPoints)) : undefined,
+    streakDays: typeof profile.streakDays === 'number' ? Math.max(0, Math.min(100000, Math.round(profile.streakDays))) : undefined,
+    xpPoints: typeof profile.xpPoints === 'number' ? Math.max(0, Math.min(10000000, Math.round(profile.xpPoints))) : undefined,
+    questionsResolved: typeof profile.questionsResolved === 'number' ? Math.max(0, Math.min(1000000, Math.round(profile.questionsResolved))) : undefined,
+    tutoringMinutes: typeof profile.tutoringMinutes === 'number' ? Math.max(0, Math.min(1000000, Math.round(profile.tutoringMinutes))) : undefined,
+    notesSavedCount: typeof profile.notesSavedCount === 'number' ? Math.max(0, Math.min(100000, Math.round(profile.notesSavedCount))) : undefined,
+    forumPostsCount: typeof profile.forumPostsCount === 'number' ? Math.max(0, Math.min(100000, Math.round(profile.forumPostsCount))) : undefined,
+    lastActiveDate: clampString(profile.lastActiveDate, 40),
+    aiExplanationStyle: profile.aiExplanationStyle === 'quick' || profile.aiExplanationStyle === 'detailed' ? profile.aiExplanationStyle : undefined,
+    emailNotifications: typeof profile.emailNotifications === 'boolean' ? profile.emailNotifications : undefined,
+    sessionReminders: typeof profile.sessionReminders === 'boolean' ? profile.sessionReminders : undefined,
     updatedAt: serverTimestamp()
   });
 
   if (!exists) {
     const createPayload = sanitizeData({
+      streakDays: 1,
+      xpPoints: 0,
+      questionsResolved: 0,
+      tutoringMinutes: 0,
+      notesSavedCount: 0,
+      forumPostsCount: 0,
+      lastActiveDate: getLocalDateKey(),
+      aiExplanationStyle: 'detailed',
+      emailNotifications: true,
+      sessionReminders: true,
       ...updatableFields,
       id: profile.id,
       email: clampString(profile.email || auth.currentUser.email || '', 200) || 'student@prolnk.edu',
@@ -204,6 +240,69 @@ export const getUserProfile = async (uid: string): Promise<UserProfileData | nul
   return null;
 };
 
+export const syncDailyStudyStreak = async (
+  uid: string,
+  profile: UserProfileData
+): Promise<{ streakDays: number; lastActiveDate: string }> => {
+  const today = getLocalDateKey();
+  const yesterday = getYesterdayDateKey();
+  const currentStreak = typeof profile.streakDays === 'number' ? profile.streakDays : 0;
+
+  if (profile.lastActiveDate === today && currentStreak > 0) {
+    return { streakDays: currentStreak, lastActiveDate: today };
+  }
+
+  const nextStreak =
+    profile.lastActiveDate === yesterday
+      ? currentStreak + 1
+      : Math.max(1, currentStreak === 0 ? 1 : 1);
+
+  if (auth.currentUser && auth.currentUser.uid === uid) {
+    const path = `users/${uid}`;
+    try {
+      await updateDoc(doc(db, 'users', uid), {
+        streakDays: nextStreak,
+        lastActiveDate: today,
+        updatedAt: serverTimestamp()
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, path);
+    }
+  }
+
+  return { streakDays: nextStreak, lastActiveDate: today };
+};
+
+export const updateUserStats = async (
+  uid: string,
+  nextValues: Partial<Pick<
+    UserProfileData,
+    'xpPoints' | 'streakDays' | 'questionsResolved' | 'tutoringMinutes' | 'notesSavedCount' | 'forumPostsCount' | 'lastActiveDate'
+  >>
+): Promise<void> => {
+  if (!auth.currentUser || auth.currentUser.uid !== uid) {
+    return;
+  }
+
+  const path = `users/${uid}`;
+  const payload = sanitizeData({
+    xpPoints: typeof nextValues.xpPoints === 'number' ? Math.max(0, Math.min(10000000, Math.round(nextValues.xpPoints))) : undefined,
+    streakDays: typeof nextValues.streakDays === 'number' ? Math.max(0, Math.min(100000, Math.round(nextValues.streakDays))) : undefined,
+    questionsResolved: typeof nextValues.questionsResolved === 'number' ? Math.max(0, Math.min(1000000, Math.round(nextValues.questionsResolved))) : undefined,
+    tutoringMinutes: typeof nextValues.tutoringMinutes === 'number' ? Math.max(0, Math.min(1000000, Math.round(nextValues.tutoringMinutes))) : undefined,
+    notesSavedCount: typeof nextValues.notesSavedCount === 'number' ? Math.max(0, Math.min(100000, Math.round(nextValues.notesSavedCount))) : undefined,
+    forumPostsCount: typeof nextValues.forumPostsCount === 'number' ? Math.max(0, Math.min(100000, Math.round(nextValues.forumPostsCount))) : undefined,
+    lastActiveDate: clampString(nextValues.lastActiveDate, 40),
+    updatedAt: serverTimestamp()
+  });
+
+  try {
+    await updateDoc(doc(db, 'users', uid), payload);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, path);
+  }
+};
+
 // User Tutoring Sessions
 export const saveUserSession = async (uid: string, session: DashboardSession): Promise<void> => {
   if (!auth.currentUser || auth.currentUser.uid !== uid) {
@@ -226,6 +325,8 @@ export const saveUserSession = async (uid: string, session: DashboardSession): P
     status: session.status,
     tutorNotes: clampString(session.tutorNotes, 1000),
     urgentUsed: session.urgentUsed,
+    meetUri: clampString(session.meetUri, 300),
+    meetCode: clampString(session.meetCode, 60),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   });
@@ -237,9 +338,61 @@ export const saveUserSession = async (uid: string, session: DashboardSession): P
   }
 };
 
+export const updateUserSessionMeet = async (
+  uid: string,
+  sessionId: string,
+  meetUri: string,
+  meetCode?: string
+): Promise<void> => {
+  if (!auth.currentUser || auth.currentUser.uid !== uid) {
+    return;
+  }
+
+  const path = `users/${uid}/sessions/${sessionId}`;
+  const sessionRef = doc(db, 'users', uid, 'sessions', sessionId);
+  try {
+    await updateDoc(
+      sessionRef,
+      sanitizeData({
+        meetUri: clampString(meetUri, 300),
+        meetCode: clampString(meetCode, 60),
+        updatedAt: serverTimestamp()
+      })
+    );
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, path);
+  }
+};
+
+export const updateUserSessionStatus = async (
+  uid: string,
+  sessionId: string,
+  status: 'completed' | 'upcoming',
+  tutorNotes?: string
+): Promise<void> => {
+  if (!auth.currentUser || auth.currentUser.uid !== uid) {
+    return;
+  }
+
+  const path = `users/${uid}/sessions/${sessionId}`;
+  const sessionRef = doc(db, 'users', uid, 'sessions', sessionId);
+  try {
+    await updateDoc(
+      sessionRef,
+      sanitizeData({
+        status,
+        tutorNotes: clampString(tutorNotes, 1000),
+        updatedAt: serverTimestamp()
+      })
+    );
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, path);
+  }
+};
+
 export const getUserSessions = async (uid: string): Promise<DashboardSession[]> => {
   if (!auth.currentUser || auth.currentUser.uid !== uid) {
-    return USER_PAST_SESSIONS;
+    return [];
   }
 
   const path = `users/${uid}/sessions`;
@@ -253,7 +406,93 @@ export const getUserSessions = async (uid: string): Promise<DashboardSession[]> 
   } catch (err) {
     handleFirestoreError(err, OperationType.LIST, path);
   }
-  return USER_PAST_SESSIONS;
+  return [];
+};
+
+// User Tasks
+export const getUserTasks = async (uid: string): Promise<UserTask[]> => {
+  if (!auth.currentUser || auth.currentUser.uid !== uid) {
+    return [];
+  }
+
+  const path = `users/${uid}/tasks`;
+  try {
+    const tasksRef = collection(db, 'users', uid, 'tasks');
+    const q = query(tasksRef, where('userId', '==', uid));
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      return snap.docs
+        .map(d => {
+          const data = d.data();
+          return {
+            ...(data as UserTask),
+            createdAt: toIsoString(data.createdAt)
+          };
+        })
+        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, path);
+  }
+  return [];
+};
+
+export const saveUserTask = async (uid: string, task: UserTask): Promise<void> => {
+  if (!auth.currentUser || auth.currentUser.uid !== uid) {
+    return;
+  }
+
+  const path = `users/${uid}/tasks/${task.id}`;
+  const taskRef = doc(db, 'users', uid, 'tasks', task.id);
+
+  const cleanTask = sanitizeData({
+    id: clampString(task.id, 128) || `task-${Date.now()}`,
+    userId: uid,
+    title: clampString(task.title, 240) || 'Study Task',
+    subject: clampString(task.subject, 80) || 'General',
+    dueDate: clampString(task.dueDate, 80) || 'This week',
+    completed: Boolean(task.completed),
+    urgency: task.urgency || 'medium',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+
+  try {
+    await setDoc(taskRef, cleanTask);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.CREATE, path);
+  }
+};
+
+export const toggleUserTask = async (uid: string, taskId: string, completed: boolean): Promise<void> => {
+  if (!auth.currentUser || auth.currentUser.uid !== uid) {
+    return;
+  }
+
+  const path = `users/${uid}/tasks/${taskId}`;
+  const taskRef = doc(db, 'users', uid, 'tasks', taskId);
+  try {
+    await updateDoc(taskRef, {
+      completed,
+      updatedAt: serverTimestamp()
+    });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, path);
+  }
+};
+
+export const deleteUserTask = async (uid: string, taskId: string): Promise<void> => {
+  if (!auth.currentUser || auth.currentUser.uid !== uid) {
+    return;
+  }
+
+  const path = `users/${uid}/tasks/${taskId}`;
+  const taskRef = doc(db, 'users', uid, 'tasks', taskId);
+  try {
+    await deleteDoc(taskRef);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, path);
+  }
 };
 
 // Community Forum Posts
@@ -319,7 +558,6 @@ export const updatePostVotes = async (postId: string, delta: 1 | -1): Promise<vo
   try {
     const snap = await getDoc(postRef);
     if (!snap.exists()) {
-      // Seeded demo post exists only in client state until created in Firestore
       return;
     }
     const existingVotes = snap.data()?.votes;
@@ -370,6 +608,20 @@ export const saveUserSketch = async (
   }
 };
 
+export const deleteUserSketch = async (uid: string, sketchId: string): Promise<void> => {
+  if (!auth.currentUser || auth.currentUser.uid !== uid) {
+    return;
+  }
+
+  const path = `users/${uid}/sketches/${sketchId}`;
+  const sketchRef = doc(db, 'users', uid, 'sketches', sketchId);
+  try {
+    await deleteDoc(sketchRef);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, path);
+  }
+};
+
 export const getUserSketches = async (uid: string): Promise<SavedSketchRecord[]> => {
   if (!auth.currentUser || auth.currentUser.uid !== uid) {
     return [];
@@ -381,13 +633,15 @@ export const getUserSketches = async (uid: string): Promise<SavedSketchRecord[]>
     const q = query(ref, where('userId', '==', uid));
     const snap = await getDocs(q);
     if (!snap.empty) {
-      return snap.docs.map(d => {
-        const data = d.data();
-        return {
-          ...(data as SavedSketchRecord),
-          createdAt: toIsoString(data.createdAt)
-        };
-      });
+      return snap.docs
+        .map(d => {
+          const data = d.data();
+          return {
+            ...(data as SavedSketchRecord),
+            createdAt: toIsoString(data.createdAt)
+          };
+        })
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     }
   } catch (err) {
     handleFirestoreError(err, OperationType.LIST, path);
