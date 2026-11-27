@@ -1,5 +1,4 @@
 import React from 'react';
-import { ProLnkLogo } from './Logo';
 import { PublicPage } from '../types';
 
 interface FooterProps {
@@ -23,19 +22,18 @@ export const Footer: React.FC<FooterProps> = ({
     <footer className="bg-[#0F2249] text-white border-t border-white/10 text-xs">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-14 space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-          {/* Left Brand Block */}
-          <div className="md:col-span-4 space-y-2.5">
+          {/* Left Brand Tagline */}
+          <div className="md:col-span-4">
             <button
               type="button"
               onClick={() => go('home')}
-              className="inline-flex items-center bg-white px-3 py-1.5 rounded-lg cursor-pointer shadow-xs"
+              className="text-left cursor-pointer group"
               aria-label="ProLnk Home"
             >
-              <ProLnkLogo size="sm" light={false} />
+              <span className="font-editorial text-2xl sm:text-[1.75rem] text-white leading-tight block group-hover:text-[#F5C52C] transition-colors">
+                Learning is connecting.
+              </span>
             </button>
-            <p className="text-xs text-slate-300 pt-1">
-              Learning is connecting.
-            </p>
           </div>
 
           {/* Center Summary & Page Navigation */}
